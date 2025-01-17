@@ -1,56 +1,119 @@
-from nav2_simple_commander.robot_navigator import BasicNavigator
-import rclpy
+#! /usr/bin/env python3
+# Copyright 2021 Samsung Research America
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from geometry_msgs.msg import PoseStamped
-from geometry_msgs.msg import Pose, Point, Quaternion
-from rclpy.time import Time
+from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
+import rclpy
+from rclpy.duration import Duration
+
+"""
+Basic navigation demo to go to pose.
+"""
 
 
-rclpy.init()
-nav = BasicNavigator()
+def main():
+    rclpy.init()
 
-def create_pose(x,y,z, orientation : Quaternion):
-    # Create the PoseStamped object
-    pose_stamped = PoseStamped()
+    navigator = BasicNavigator()
 
-    # Set the header
-    pose_stamped.header.frame_id = "map"  # Replace with the desired frame ID
-    pose_stamped.header.stamp = Time().to_msg()  # Current time (requires ROS clock)
+    # Set our demo's initial pose
+    initial_pose = PoseStamped()
+    initial_pose.header.frame_id = 'map'
+    initial_pose.header.stamp = navigator.get_clock().now().to_msg()
+    initial_pose.pose.position.x = 1.43
+    initial_pose.pose.position.y = 0.01
+    initial_pose.pose.orientation.z = 0.0
+    initial_pose.pose.orientation.w = 1.0
+    #navigator.setInitialPose(initial_pose)
 
-    # Set the pose
-    pose_stamped.pose = Pose(
-        position=Point(x=1.0, y=2.0, z=0.0),  # Set the position (x, y, z)
-        orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)  # Set the orientation (x, y, z, w)
-    )
+    # Activate navigation, if not autostarted. This should be called after setInitialPose()
+    # or this will initialize at the origin of the map and update the costmap with bogus readings.
+    # If autostart, you should `waitUntilNav2Active()` instead.
+    # navigator.lifecycleStartup()
 
-    return pose_stamped
+    # Wait for navigation to fully activate, since autostarting nav2
+    navigator.waitUntilNav2Active()
 
-identity_quaternion = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+    # If desired, you can change or load the map as well
+    # navigator.changeMap('/path/to/map.yaml')
 
-goal_pose = create_pose(0.35, -0.624, 0, identity_quaternion)
-init_pose = create_pose(0.42, 0.0273, 0, identity_quaternion)
+    # You may use the navigator to clear or obtain costmaps
+    # navigator.clearAllCostmaps()  # also have clearLocalCostmap() and clearGlobalCostmap()
+    # global_costmap = navigator.getGlobalCostmap()
+    # local_costmap = navigator.getLocalCostmap()
 
-nav.setInitialPose(init_pose)
-nav.waitUntilNav2Active() # if autostarted, else use lifecycleStartup()
+    # Go to our demos first goal pose
+    goal_pose = PoseStamped()
+    goal_pose.header.frame_id = 'map'
+    goal_pose.header.stamp = navigator.get_clock().now().to_msg()
+    goal_pose.pose.position.x = 0.056
+    goal_pose.pose.position.y = 0.01
+    goal_pose.pose.orientation.w = 1.0
+    goal_pose.pose.orientation.z = 0.0
 
-# ...
+    # sanity check a valid path exists
+    # path = navigator.getPath(initial_pose, goal_pose)
 
-path = nav.getPath(init_pose, goal_pose)
-smoothed_path = nav.smoothPath(path)
+    navigator.goToPose(goal_pose)
 
-# ...
+    i = 0
+    while not navigator.isTaskComplete():
+        ################################################
+        #
+        # Implement some code here for your application!
+        #
+        ################################################
 
-nav.goToPose(goal_pose)
-while not nav.isNavComplete():
-  feedback = nav.getFeedback()
-  if feedback.navigation_duration > 600:
-    nav.cancelTask()
+        # Do something with the feedback
+        i = i + 1
+        feedback = navigator.getFeedback()
+        if feedback and i % 5 == 0:
+            print(
+                'Estimated time of arrival: '
+                + '{0:.0f}'.format(
+                    Duration.from_msg(feedback.estimated_time_remaining).nanoseconds
+                    / 1e9
+                )
+                + ' seconds.'
+            )
 
-# ...
+            # Some navigation timeout to demo cancellation
+            if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
+                navigator.cancelTask()
 
-result = nav.getResult()
-if result == NavigationResult.SUCCEEDED:
-    print('Goal succeeded!')
-elif result == NavigationResult.CANCELED:
-    print('Goal was canceled!')
-elif result == NavigationResult.FAILED:
-    print('Goal failed!')
+            # Some navigation request change to demo preemption
+            if Duration.from_msg(feedback.navigation_time) > Duration(seconds=18.0):
+                goal_pose.pose.position.x = 0.0
+                goal_pose.pose.position.y = 0.0
+                navigator.goToPose(goal_pose)
+
+    # Do something depending on the return code
+    result = navigator.getResult()
+    if result == TaskResult.SUCCEEDED:
+        print('Goal succeeded!')
+    elif result == TaskResult.CANCELED:
+        print('Goal was canceled!')
+    elif result == TaskResult.FAILED:
+        print('Goal failed!')
+    else:
+        print('Goal has an invalid return status!')
+
+    navigator.lifecycleShutdown()
+
+    exit(0)
+
+
+if __name__ == '__main__':
+    main()
