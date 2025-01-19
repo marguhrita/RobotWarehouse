@@ -5,9 +5,9 @@ from rclpy.duration import Duration
 
 class Bot():
 
-    def __init__(self : object, initial_position : tuple[float, float, float]):
+    def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
         rclpy.init()
-        self.navigator = BasicNavigator()
+        self.navigator = BasicNavigator(namespace)
         
         # Set initial pose
         initial_pose = self.get_pose_stamped(initial_position)
@@ -35,7 +35,65 @@ class Bot():
         return initial_pose
     
     def navigate_to_position(self, pos : tuple[float, float, float]):
+        x,y,z = pos
+
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+        goal_pose.pose.position.x = x
+        goal_pose.pose.position.y = y
+        goal_pose.pose.orientation.w = 1.0
+        goal_pose.pose.orientation.z = 0.0
+
+
+        # sanity check a valid path exists
+        # path = navigator.getPath(initial_pose, goal_pose)
+
+        self.navigator.goToPose(goal_pose)
+
+        i = 0
+        while not self.navigator.isTaskComplete():
+            ################################################
+            #
+            # Implement some code here for your application!
+            #
+            ################################################
+
+            # Do something with the feedback
+            i = i + 1
+            feedback = self.navigator.getFeedback()
+            if feedback and i % 5 == 0:
+                print(
+                    'Estimated time of arrival: '
+                    + '{0:.0f}'.format(
+                        Duration.from_msg(feedback.estimated_time_remaining).nanoseconds
+                        / 1e9
+                    )
+                    + ' seconds.'
+                )
+
+                # Some navigation timeout to demo cancellation
+                if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
+                    self.navigator.cancelTask()
+
+                # Some navigation request change to demo preemption
+                if Duration.from_msg(feedback.navigation_time) > Duration(seconds=18.0):
+                    goal_pose.pose.position.x = 0.0
+                    goal_pose.pose.position.y = 0.0
+                    self.navigator.goToPose(goal_pose)
+
+        # Do something depending on the return code
+        result = self.navigator.getResult()
+        if result == TaskResult.SUCCEEDED:
+            print('Goal succeeded!')
+        elif result == TaskResult.CANCELED:
+            print('Goal was canceled!')
+        elif result == TaskResult.FAILED:
+            print('Goal failed!')
+        else:
+            print('Goal has an invalid return status!')
+
+        self.navigator.lifecycleShutdown()
+            
         
-        
-    
-        
+            
