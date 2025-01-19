@@ -1,5 +1,7 @@
 import pygame
 
+
+#region pygame init
 pygame.init()
 
 # Screen dimensions
@@ -42,6 +44,8 @@ class Button():
             if self.rect.collidepoint(event.pos):
                 return True
         return False
+
+#endregion
 
 
 
