@@ -36,18 +36,18 @@ def main():
     initial_pose.pose.position.y = 0.01
     initial_pose.pose.orientation.z = 0.0
     initial_pose.pose.orientation.w = 1.0
-    #navigator.setInitialPose(initial_pose)
+    navigator.setInitialPose(initial_pose)
 
     # Activate navigation, if not autostarted. This should be called after setInitialPose()
     # or this will initialize at the origin of the map and update the costmap with bogus readings.
     # If autostart, you should `waitUntilNav2Active()` instead.
-    # navigator.lifecycleStartup()
+    navigator.lifecycleStartup()
 
     # Wait for navigation to fully activate, since autostarting nav2
-    navigator.waitUntilNav2Active()
+    navigator.waitUntilNav2Active(navigator="bt_navigator", localizer="amcl")
 
     # If desired, you can change or load the map as well
-    # navigator.changeMap('/path/to/map.yaml')
+    navigator.changeMap('map.yaml')
 
     # You may use the navigator to clear or obtain costmaps
     # navigator.clearAllCostmaps()  # also have clearLocalCostmap() and clearGlobalCostmap()
@@ -110,7 +110,7 @@ def main():
     else:
         print('Goal has an invalid return status!')
 
-    navigator.lifecycleShutdown()
+    #navigator.lifecycleShutdown()
 
     exit(0)
 

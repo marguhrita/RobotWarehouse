@@ -1,5 +1,5 @@
 import pygame
-
+from nav_controller import Bot
 
 #region pygame init
 pygame.init()
@@ -47,7 +47,9 @@ class Button():
 
 #endregion
 
-
+#region commander init
+bot = Bot((1.43,0.01,0), "bot1")
+print("Bot Created!")
 
 
 # Main loop
@@ -88,10 +90,12 @@ def main():
                 running = False
 
             if button_goal_a.is_clicked(event):
-                print("Goal A clicked!")
+                print("Navigating to Goal A!!")
+                bot.navigate_to_position((0.056,0.01,0))
 
             if button_goal_b.is_clicked(event):
                 print("Goal B clicked!")
+                bot.navigate_to_position((1.43,0.01,0))
 
         # draw map
         pygame.draw.rect(screen, GRAY, map)
@@ -101,6 +105,8 @@ def main():
         pygame.display.flip()
         clock.tick(60)
 
+    bot.end_nav2_process()
+    print("Shutting down nav2")
     pygame.quit()
 
 if __name__ == "__main__":

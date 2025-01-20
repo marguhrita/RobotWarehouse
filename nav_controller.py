@@ -2,23 +2,45 @@ from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import rclpy
 from rclpy.duration import Duration
+import subprocess
+import time
 
 class Bot():
 
     def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
         rclpy.init()
-        self.navigator = BasicNavigator(namespace)
+        self.navigator = BasicNavigator()
         
         # Set initial pose
         initial_pose = self.get_pose_stamped(initial_position)
         self.navigator.setInitialPose(initial_pose)
         
         #  navigator.lifecycleStartup()
+
+        #autostart nav2
+        self.nav2_process = self.nav2_autostart("map.yaml")
         self.navigator.waitUntilNav2Active()
 
         # Load Map
         self.navigator.changeMap('map.yaml')
 
+    def nav2_autostart(self, map_path : str):
+        # Run the ros2 launch command
+        process = subprocess.Popen(
+            ['ros2', 'launch', 'turtlebot3_navigation2', 'navigation2.launch.py', f'map:={map_path}'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
+        print("Nav2 starting..")
+        #time.sleep(5)
+
+
+        return process
+    
+
+    def end_nav2_process(self):
+        self.nav2_process.terminate()
 
     def get_pose_stamped(self, pos : tuple[float, float, float]) -> PoseStamped:
 
@@ -93,7 +115,7 @@ class Bot():
         else:
             print('Goal has an invalid return status!')
 
-        self.navigator.lifecycleShutdown()
+        #self.navigator.lifecycleShutdown()
             
         
             
