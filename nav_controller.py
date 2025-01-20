@@ -18,7 +18,7 @@ class Bot():
         #  navigator.lifecycleStartup()
 
         #autostart nav2
-        self.nav2_process = self.nav2_autostart("map.yaml")
+        #self.nav2_process = self.nav2_autostart("map.yaml")
         self.navigator.waitUntilNav2Active()
 
         # Load Map
@@ -27,7 +27,7 @@ class Bot():
     def nav2_autostart(self, map_path : str):
         # Run the ros2 launch command
         process = subprocess.Popen(
-            ['ros2', 'launch', 'turtlebot3_navigation2', 'navigation2.launch.py', f'map:={map_path}'],
+            ["gnome-terminal", "--", 'ros2', 'launch', 'turtlebot3_navigation2', 'navigation2.launch.py', f'map:={map_path}'],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
@@ -98,11 +98,6 @@ class Bot():
                 if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
                     self.navigator.cancelTask()
 
-                # Some navigation request change to demo preemption
-                if Duration.from_msg(feedback.navigation_time) > Duration(seconds=18.0):
-                    goal_pose.pose.position.x = 0.0
-                    goal_pose.pose.position.y = 0.0
-                    self.navigator.goToPose(goal_pose)
 
         # Do something depending on the return code
         result = self.navigator.getResult()
