@@ -9,17 +9,20 @@ class Bot():
 
     def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
         rclpy.init()
-        self.navigator = BasicNavigator()
+        self.navigator = BasicNavigator(namespace)
         
         # Set initial pose
-        initial_pose = self.get_pose_stamped(initial_position)
-        self.navigator.setInitialPose(initial_pose)
+        self.initial_pos = initial_position
+        initial_pose_stamped = self.get_pose_stamped(initial_position)
         
-        #  navigator.lifecycleStartup()
+        
+        self.navigator.lifecycleStartup()
 
         #autostart nav2
         #self.nav2_process = self.nav2_autostart("map.yaml")
         self.navigator.waitUntilNav2Active()
+        self.navigator.setInitialPose(initial_pose_stamped)
+
 
         # Load Map
         self.navigator.changeMap('map.yaml')
@@ -42,6 +45,9 @@ class Bot():
     def end_nav2_process(self):
         self.nav2_process.terminate()
 
+    def go_to_initial_pose(self):
+        self.navigate_to_position(self.initial_pos, False)
+
     def get_pose_stamped(self, pos : tuple[float, float, float]) -> PoseStamped:
 
         x, y, z = pos
@@ -56,8 +62,12 @@ class Bot():
 
         return initial_pose
     
-    def navigate_to_position(self, pos : tuple[float, float, float]):
-        x,y,z = pos
+    def fetch_item(self, goal_pose : tuple[float, float, float]):
+        self.navigate_to_position(goal_pose, True)
+
+
+
+    def navigate_to_position(self, x,y,z, fetching : bool):
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
@@ -103,6 +113,9 @@ class Bot():
         result = self.navigator.getResult()
         if result == TaskResult.SUCCEEDED:
             print('Goal succeeded!')
+            if fetching:
+                x,y,z = self.initial_pos
+                self.navigate_to_position(x,y,z, False)
         elif result == TaskResult.CANCELED:
             print('Goal was canceled!')
         elif result == TaskResult.FAILED:

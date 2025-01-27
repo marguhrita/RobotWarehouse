@@ -11,6 +11,8 @@ screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Robot Warehouse")
 
 
+
+
 # constants
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
@@ -50,12 +52,12 @@ class Button():
 #endregion
 
 #region commander init
-bot = Bot((1.7,0.222,0), "bot1")
+#bot = Bot((1.7,0.222,0),"tb3_0")
 print("Bot Created!")
 
 def navigate(x,y,z):
 
-    nav_thread = threading.Thread(target=bot.navigate_to_position((x,y,z)))
+    nav_thread = threading.Thread(target=bot.navigate_to_position, args = (x,y,z))
     nav_thread.start()
 
 # Main loop
@@ -98,19 +100,23 @@ def main():
             if button_goal_a.is_clicked(event):
                 print("Navigating to Goal A!!")
                 #bot.navigate_to_position((0.056,0.01,0))
+                #navigate(0.056,0.01,0)
 
             if button_goal_b.is_clicked(event):
                 print("Goal B clicked!")
-                bot.navigate_to_position((1.43,0.01,0))
+                #bot.navigate_to_position((1.43,0.01,0))
+                #navigate(1.43,0.01,0)
 
             if button_goal_c.is_clicked(event):
                 print("Goal C clicked!")
-                bot.navigate_to_position((-0.9,1.44,0))
+                #bot.navigate_to_position((-0.9,1.44,0))
+                #navigate(-0.9,1.44,0)
 
 
             if button_goal_d.is_clicked(event):
                 print("Goal D clicked!")
-                bot.navigate_to_position((-0.9,-0.8,0))
+                #bot.navigate_to_position((-0.9,-0.8,0))
+                #navigate(-0.9,-0.8,0)
 
         # draw map
         pygame.draw.rect(screen, GRAY, map)
