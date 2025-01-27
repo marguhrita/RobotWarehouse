@@ -10,8 +10,19 @@ SCREEN_WIDTH, SCREEN_HEIGHT = 800, 400
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Robot Warehouse")
 
+def pgm():
+    # Load PGM image using Pillow
+    pgm_path = "map.pgm"  # Replace with your PGM file path
+    image = Image.open(pgm_path)
 
+    # Convert Pillow image to Pygame surface
+    mode = image.mode
+    size = image.size
+    data = image.tobytes()
+    pgm_surface = pygame.image.fromstring(data, size, mode)
+    return pgm_surface
 
+pgm_surface = pgm()
 
 # constants
 WHITE = (255, 255, 255)
@@ -86,7 +97,7 @@ def main():
     button_list.append(button_goal_c)
     button_list.append(button_goal_d)
 
-    map = pygame.Rect(400, 20, 350, 350)
+    #map = pygame.Rect(400, 20, 350, 350)
 
 
 
@@ -119,7 +130,8 @@ def main():
                 #navigate(-0.9,-0.8,0)
 
         # draw map
-        pygame.draw.rect(screen, GRAY, map)
+        #pygame.draw.rect(screen, GRAY, map)
+        screen.blit(pgm_surface, (0, 0))
 
         for button in button_list:
             button.draw(screen)
