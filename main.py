@@ -1,6 +1,7 @@
 import pygame
 import threading
 from nav_controller import Bot
+from PIL import Image
 
 #region pygame init
 pygame.init()
@@ -9,17 +10,20 @@ pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 400
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Robot Warehouse")
-
 def pgm():
     # Load PGM image using Pillow
     pgm_path = "map.pgm"  # Replace with your PGM file path
     image = Image.open(pgm_path)
 
+    # Convert grayscale to RGB (Pygame requires RGB format)
+    image = image.convert("RGB")
+
+    # Resize image to 350x350 (using LANCZOS for high-quality scaling)
+    image = image.resize((350, 350), Image.LANCZOS)
+
     # Convert Pillow image to Pygame surface
-    mode = image.mode
-    size = image.size
-    data = image.tobytes()
-    pgm_surface = pygame.image.fromstring(data, size, mode)
+    pgm_surface = pygame.image.fromstring(image.tobytes(), image.size, "RGB")
+    
     return pgm_surface
 
 pgm_surface = pgm()
@@ -131,7 +135,7 @@ def main():
 
         # draw map
         #pygame.draw.rect(screen, GRAY, map)
-        screen.blit(pgm_surface, (0, 0))
+        screen.blit(pgm_surface, (400, 20))
 
         for button in button_list:
             button.draw(screen)
