@@ -13,7 +13,7 @@ import rclpy
 pygame.init()
 
 # Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 800
+SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 1000
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Robot Warehouse")
 def pgm():
@@ -75,15 +75,15 @@ class Button():
                 return True
         return False
 
-#endregion
+
 
 
 class StatusBar:
-    def __init__(self, x, y, width, height, name="Robot", battery=100, status="Idle"):
+    def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, status="Idle"):
         self.x, self.y = x, y
         self.width, self.height = width, height
         self.name = name
-        self.battery = battery  # Battery percentage (1-100)
+        self.battery = battery 
         self.status = status
 
     def draw(self, surface):
@@ -94,25 +94,27 @@ class StatusBar:
         name_text = font.render(f"Name: {self.name}", True, BLACK)
         surface.blit(name_text, (self.x + 10, self.y + 10))
 
+
+        # Draw status text
+        status_text = font.render(f"Status: {self.status}", True, BLACK)
+        surface.blit(status_text, (self.x + 10, self.y + 40))
+
         # Draw battery bar outline
         battery_x = self.x + 10
-        battery_y = self.y + 40
+        battery_y = self.y + 70
         battery_width = 200
         battery_height = 25
         pygame.draw.rect(surface, BLACK, (battery_x, battery_y, battery_width, battery_height), 2)
 
         # Fill battery level
         battery_fill_width = int((self.battery / 100) * (battery_width - 4))
-        battery_fill_color = GREEN if self.battery > 30 else RED
+        battery_fill_color = GREEN if self.battery > 20 else RED
         pygame.draw.rect(surface, battery_fill_color, (battery_x + 2, battery_y + 2, battery_fill_width, battery_height - 4))
 
         # Display battery percentage
         battery_text = font.render(f"Battery: {self.battery}%", True, BLACK)
         surface.blit(battery_text, (battery_x + battery_width + 10, battery_y))
 
-        # Draw status text
-        status_text = font.render(f"Status: {self.status}", True, BLACK)
-        surface.blit(status_text, (self.x + 10, self.y + 75))
 
     def update_battery(self, value):
         self.battery = max(1, min(100, value))  # Clamp battery between 1 and 100
@@ -121,7 +123,7 @@ class StatusBar:
         self.status = new_status
 
 
-
+#endregion
 
 
 class RobotManager():
@@ -167,7 +169,7 @@ def navigate(x,y,z):
 def main():
     clock = pygame.time.Clock()
     running = True
-    mainpage=True
+    mainpage = True
     button_list = []
 
     #region navbarinit
@@ -177,33 +179,62 @@ def main():
 
     button_list.append(button_nav_main)
 
-
     #region mainpageinit
-
     offset_y = 100
     offset_x = 175
     start_y = 150
     start_x = 25
-    button_goal_a = Button(start_x, start_y, 150, 80, "Goal A", font, GRAY, DARK_GRAY)
-    button_goal_b = Button(start_x + offset_x, start_y, 150, 80, "Goal B", font, GRAY, DARK_GRAY)
-    button_goal_c = Button(start_x, + start_y + offset_y, 150, 80, "Goal C", font, GRAY, DARK_GRAY)
-    button_goal_d = Button(start_x + offset_x, start_y + offset_y, 150, 80, "Goal D", font, GRAY, DARK_GRAY)
-    button_start = Button(start_x, start_y + offset_y * 2, 150, 80, "START", font, GREEN, DARK_GRAY)
-    button_stop = Button(start_x + offset_x, start_y + offset_y * 2, 150, 80, "STOP", font, RED, DARK_GRAY)
+    # button_goal_a = Button(start_x, start_y, 150, 80, "Goal A", font, GRAY, DARK_GRAY)
+    # button_goal_b = Button(start_x + offset_x, start_y, 150, 80, "Goal B", font, GRAY, DARK_GRAY)
+    # button_goal_c = Button(start_x, + start_y + offset_y, 150, 80, "Goal C", font, GRAY, DARK_GRAY)
+    # button_goal_d = Button(start_x + offset_x, start_y + offset_y, 150, 80, "Goal D", font, GRAY, DARK_GRAY)
+    button_start = Button(50, start_y + offset_y * 2, 150, 80, "START", font, GREEN, DARK_GRAY)
+    button_stop = Button(50, SCREEN_HEIGHT - 100, 150, 80, "STOP", font, RED, DARK_GRAY)
 
 
     # button list
-    #button_list.append(button_goal_a)
-    #button_list.append(button_goal_b)
     button_list.append(button_stop)
-    button_list.append(button_start)
-    button_list.append(button_goal_c)
-    button_list.append(button_goal_d)
+    #button_list.append(button_start)
+    
     #endregion
 
     #region robot status
-    #status_x, status_y, status_width, status_height = 25, 150, 600, 100
-    status_bar = StatusBar(25, 150, 600, 100)
+
+    # Declare positions for consecutive status bars to go
+    y_lim : int = SCREEN_HEIGHT - 200
+    x_lim : int = SCREEN_WIDTH
+    status_pos : tuple[int, int] = []
+    status_list : StatusBar = []
+    status_gap = 30
+    status_width = 500
+    status_height = 100
+    y_app = status_height + status_gap
+    x_app = status_width + status_gap
+
+    s_x = 80
+    s_y = 150
+    status_pos.append((s_x, s_y))
+    s_y += y_app
+    # Populate status positions
+    while not s_y + status_gap + status_height > y_lim and not s_x + status_gap + status_width > x_lim:
+        # add position to list, and increment row
+        status_pos.append((s_x, s_y))
+        s_y += y_app
+
+        # If we have reached the bottom of current column, increment column and reset y pos
+        if s_y + status_gap + status_height > y_lim:
+            s_x += x_app
+            s_y = 150
+            print(not s_x + status_gap + status_width > x_lim)
+            
+
+
+    print(status_pos)
+    for i in range(len(status_pos)):
+        print(i)
+
+        status_list.append(StatusBar(status_pos[i][0], status_pos[i][1]))
+
 
     #endregion
     
@@ -217,30 +248,8 @@ def main():
                 running = False
 
             #region mainpage
-            if button_goal_a.is_clicked(event):
-                print("Navigating to Goal A!!")
-                #bot.navigate_to_position((0.056,0.01,0))
-                #navigate(0.056,0.01,0)
-
-            if button_goal_b.is_clicked(event):
-                print("Goal B clicked!")
-                #bot.navigate_to_position((1.43,0.01,0))
-                #navigate(1.43,0.01,0)
-
-            if button_goal_c.is_clicked(event):
-                print("Goal C clicked!")
-                #bot.navigate_to_position((-0.9,1.44,0))
-                #navigate(-0.9,1.44,0)
-
-
-            if button_goal_d.is_clicked(event):
-                print("Goal D clicked!")
-                #bot.navigate_to_position((-0.9,-0.8,0))
-                #navigate(-0.9,-0.8,0)
-
-            if button_start.is_clicked(event):
-                print("start")
-                #state_pub.publish("tb3", RobotState.ONLINE)
+            if button_stop.is_clicked(event):
+                print("STOPPING")
 
             #endregion
 
@@ -257,8 +266,8 @@ def main():
 
             #status
             #pygame.draw.rect(screen, CREAM, (status_x, status_y, status_width, status_height))
-            status_bar.draw(screen)
-
+            for s in status_list:
+                s.draw(screen)
             
         pygame.display.flip()
         clock.tick(60)
