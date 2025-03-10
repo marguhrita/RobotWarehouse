@@ -1,6 +1,8 @@
 import math
 import time
 from geometry_msgs.msg import Quaternion
+import rclpy
+from state_pubsub.state_pub import RobotStatePub, RobotState
 
 def timed(fn):
     """ Decorator to time functions. For debugging time critical code """
@@ -80,3 +82,16 @@ def getHeading(q):
     yaw = math.atan2(2 * (q.x * q.y + q.w * q.z),
                      q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z)
     return yaw
+
+class RobotStatePublisher():
+    def __init__(self):
+        rclpy.init()
+
+        self.robot_state_pub = RobotStatePub()
+
+    def publish(self, namespace : str, state : RobotState):
+        self.robot_state_pub.publish(namespace, state.name)
+
+    def shutdown(self):
+        self.robot_state_pub.destroy_node()
+        rclpy.shutdown()

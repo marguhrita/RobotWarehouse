@@ -18,11 +18,6 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import rclpy
 from rclpy.duration import Duration
 
-"""
-Basic navigation demo to go to pose.
-"""
-
-
 def main():
     rclpy.init()
 

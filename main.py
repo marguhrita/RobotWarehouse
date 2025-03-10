@@ -2,12 +2,19 @@ import pygame
 import threading
 from nav_controller import Bot
 from PIL import Image
+from util import RobotStatePublisher
+from state_pubsub.state_pub import RobotState
+from state_pubsub.state_sub import RobotStateSub
+from typing import List, TypedDict
+from dataclasses import dataclass
+import rclpy
+
 
 #region pygame init
 pygame.init()
 
 # Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 400
+SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 800
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Robot Warehouse")
 def pgm():
@@ -35,6 +42,9 @@ GRAY = (200, 200, 200)
 DARK_GRAY = (150, 150, 150)
 RED = (255,0,0)
 GREEN = (0,255,0)
+ALGAE = (96, 108, 56)
+DARK_GREEN = (40, 54, 24)
+CREAM = (254, 250, 224)
 
 class Button():
     def __init__(self, x, y, width, height, text, font, base_color, hover_color):
@@ -66,52 +76,96 @@ class Button():
 
 #endregion
 
+
+
+class RobotManager():
+    """
+    Stores a list of robots, as well as their current state.\n
+    Updates their current state by observing robot_state topic as well as other topics.
+
+    Class Variables:
+    - `bots` (list[BotEntry]): Tracks available robots and holds relevant information about them (state)
+    """
+    def __init__(self):
+
+        rclpy.init()
+        self.sub = RobotStateSub()
+
+        #start subscriber in different thread
+        ros_thread = threading.Thread(target=self.start_subscriber, args=(self.sub,), daemon=True)
+        ros_thread.start()
+
+    def start_subscriber(self, node):
+        rclpy.spin(node)
+
+    def stop_subscriber(self):
+        # Cleanup
+        self.sub.destroy_node()
+        rclpy.shutdown()
+
+
 #region commander init
 #bot = Bot((1.7,0.222,0),"tb3_0")
-print("Bot Created!")
+
+bot_manager = RobotManager()
+
+
 
 def navigate(x,y,z):
-
     nav_thread = threading.Thread(target=bot.navigate_to_position, args = (x,y,z))
     nav_thread.start()
+
+#state_pub = RobotStatePublisher()
 
 # Main loop
 def main():
     clock = pygame.time.Clock()
     running = True
-    font = pygame.font.Font(None, 40)  # Default Pygame font
+    mainpage=True
+    font = pygame.font.Font(None, 40)
+    button_list = []
+
+    #region navbarinit
+    nav_pad = 20
+    nav_x, nav_y, nav_width, nav_height = 0, 0, SCREEN_WIDTH, 120
+    button_nav_main = Button(nav_pad, nav_pad, 150, 80, "Home", font, CREAM, DARK_GRAY)
+
+    button_list.append(button_nav_main)
+
+
+    #region mainpageinit
+
     offset_y = 100
     offset_x = 175
-    start_y = 20
+    start_y = 150
     start_x = 25
     button_goal_a = Button(start_x, start_y, 150, 80, "Goal A", font, GRAY, DARK_GRAY)
     button_goal_b = Button(start_x + offset_x, start_y, 150, 80, "Goal B", font, GRAY, DARK_GRAY)
     button_goal_c = Button(start_x, + start_y + offset_y, 150, 80, "Goal C", font, GRAY, DARK_GRAY)
     button_goal_d = Button(start_x + offset_x, start_y + offset_y, 150, 80, "Goal D", font, GRAY, DARK_GRAY)
-    button_stop = Button(start_x, start_y + offset_y * 2, 150, 80, "START", font, GREEN, DARK_GRAY)
-    button_start = Button(start_x + offset_x, start_y + offset_y * 2, 150, 80, "STOP", font, RED, DARK_GRAY)
+    button_start = Button(start_x, start_y + offset_y * 2, 150, 80, "START", font, GREEN, DARK_GRAY)
+    button_stop = Button(start_x + offset_x, start_y + offset_y * 2, 150, 80, "STOP", font, RED, DARK_GRAY)
 
 
     # button list
-    button_list = []
     button_list.append(button_goal_a)
     button_list.append(button_goal_b)
     button_list.append(button_stop)
     button_list.append(button_start)
     button_list.append(button_goal_c)
     button_list.append(button_goal_d)
-
-    #map = pygame.Rect(400, 20, 350, 350)
-
-
-
+    #endregion
+    
+ 
     while running:
-        screen.fill(WHITE)
+        screen.fill(ALGAE)
 
+        #events
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
+            #region mainpage
             if button_goal_a.is_clicked(event):
                 print("Navigating to Goal A!!")
                 #bot.navigate_to_position((0.056,0.01,0))
@@ -133,12 +187,24 @@ def main():
                 #bot.navigate_to_position((-0.9,-0.8,0))
                 #navigate(-0.9,-0.8,0)
 
-        # draw map
-        #pygame.draw.rect(screen, GRAY, map)
-        screen.blit(pgm_surface, (400, 20))
+            if button_start.is_clicked(event):
+                print("start")
+                #state_pub.publish("tb3", RobotState.ONLINE)
 
-        for button in button_list:
-            button.draw(screen)
+            #endregion
+
+        #Nav bar
+        pygame.draw.rect(screen, DARK_GREEN, (nav_x, nav_y, nav_width, nav_height))
+
+        
+        if mainpage:
+            # drawing
+            screen.blit(pgm_surface, (400, 150))
+
+            for button in button_list:
+                button.draw(screen)
+
+            
         pygame.display.flip()
         clock.tick(60)
 

@@ -5,8 +5,9 @@ from rclpy.duration import Duration
 import subprocess
 import time
 
-class Bot():
 
+
+class Bot():
     def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
         rclpy.init()
         self.navigator = BasicNavigator(namespace)
@@ -23,6 +24,8 @@ class Bot():
         self.navigator.waitUntilNav2Active()
         self.navigator.setInitialPose(initial_pose_stamped)
 
+
+        
 
         # Load Map
         self.navigator.changeMap('map.yaml')
