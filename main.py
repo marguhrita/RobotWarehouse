@@ -6,7 +6,6 @@ from util import RobotStatePublisher
 from state_pubsub.state_pub import RobotState
 from state_pubsub.state_sub import RobotStateSub
 from typing import List, TypedDict
-from dataclasses import dataclass
 import rclpy
 
 
@@ -45,6 +44,8 @@ GREEN = (0,255,0)
 ALGAE = (96, 108, 56)
 DARK_GREEN = (40, 54, 24)
 CREAM = (254, 250, 224)
+font = pygame.font.Font(None, 40)
+
 
 class Button():
     def __init__(self, x, y, width, height, text, font, base_color, hover_color):
@@ -75,6 +76,51 @@ class Button():
         return False
 
 #endregion
+
+
+class StatusBar:
+    def __init__(self, x, y, width, height, name="Robot", battery=100, status="Idle"):
+        self.x, self.y = x, y
+        self.width, self.height = width, height
+        self.name = name
+        self.battery = battery  # Battery percentage (1-100)
+        self.status = status
+
+    def draw(self, surface):
+        # Draw status bar background
+        pygame.draw.rect(surface, CREAM, (self.x, self.y, self.width, self.height), border_radius=10)
+
+        # Draw name
+        name_text = font.render(f"Name: {self.name}", True, BLACK)
+        surface.blit(name_text, (self.x + 10, self.y + 10))
+
+        # Draw battery bar outline
+        battery_x = self.x + 10
+        battery_y = self.y + 40
+        battery_width = 200
+        battery_height = 25
+        pygame.draw.rect(surface, BLACK, (battery_x, battery_y, battery_width, battery_height), 2)
+
+        # Fill battery level
+        battery_fill_width = int((self.battery / 100) * (battery_width - 4))
+        battery_fill_color = GREEN if self.battery > 30 else RED
+        pygame.draw.rect(surface, battery_fill_color, (battery_x + 2, battery_y + 2, battery_fill_width, battery_height - 4))
+
+        # Display battery percentage
+        battery_text = font.render(f"Battery: {self.battery}%", True, BLACK)
+        surface.blit(battery_text, (battery_x + battery_width + 10, battery_y))
+
+        # Draw status text
+        status_text = font.render(f"Status: {self.status}", True, BLACK)
+        surface.blit(status_text, (self.x + 10, self.y + 75))
+
+    def update_battery(self, value):
+        self.battery = max(1, min(100, value))  # Clamp battery between 1 and 100
+
+    def update_status(self, new_status):
+        self.status = new_status
+
+
 
 
 
@@ -122,7 +168,6 @@ def main():
     clock = pygame.time.Clock()
     running = True
     mainpage=True
-    font = pygame.font.Font(None, 40)
     button_list = []
 
     #region navbarinit
@@ -148,12 +193,18 @@ def main():
 
 
     # button list
-    button_list.append(button_goal_a)
-    button_list.append(button_goal_b)
+    #button_list.append(button_goal_a)
+    #button_list.append(button_goal_b)
     button_list.append(button_stop)
     button_list.append(button_start)
     button_list.append(button_goal_c)
     button_list.append(button_goal_d)
+    #endregion
+
+    #region robot status
+    #status_x, status_y, status_width, status_height = 25, 150, 600, 100
+    status_bar = StatusBar(25, 150, 600, 100)
+
     #endregion
     
  
@@ -199,17 +250,21 @@ def main():
         
         if mainpage:
             # drawing
-            screen.blit(pgm_surface, (400, 150))
+            #screen.blit(pgm_surface, (400, 150))
 
             for button in button_list:
                 button.draw(screen)
+
+            #status
+            #pygame.draw.rect(screen, CREAM, (status_x, status_y, status_width, status_height))
+            status_bar.draw(screen)
 
             
         pygame.display.flip()
         clock.tick(60)
 
-    bot.end_nav2_process()
-    print("Shutting down nav2")
+    #bot.end_nav2_process()
+    #print("Shutting down nav2")
     pygame.quit()
 
 if __name__ == "__main__":
