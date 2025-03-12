@@ -10,7 +10,7 @@ from util import RobotStatePublisher, RobotState
 
 class Bot():
     def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
-        rclpy.init()
+        #rclpy.init()
         self.navigator = BasicNavigator(namespace)
         self.namespace = namespace
         

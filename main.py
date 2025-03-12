@@ -49,7 +49,7 @@ class RobotManager():
         while True:
             for bot in self.sub.bots:
                 if bot.nav_manager == None:
-                    bot.nav_manager = Bot((0,0,0), bot.name)
+                    bot.nav_manager = Bot((0.0,0.0,0.0), bot.name)
                     print(bot)
             time.sleep(1)
 
@@ -239,7 +239,6 @@ def navigate(x,y,z):
     nav_thread.start()
 
 #state_pub = RobotStatePublisher()
-fps = 0
 
 # Main loop
 def main():
@@ -247,6 +246,8 @@ def main():
     running = True
     mainpage = True
     button_list = []
+    fps = 0
+
 
     #region navbarinit
     nav_pad = 20
@@ -302,7 +303,6 @@ def main():
             
     #console
     console = Console(0, SCREEN_HEIGHT-100, SCREEN_WIDTH, 100, bot_manager)
- 
     #endregion
     
     
@@ -328,8 +328,7 @@ def main():
             fps = 0
             bots = bot_manager.sub.bots
             for i in range(len(bots)):
-                print(bot_manager.sub.bots)
-                print(RobotState(bots[i].state))
+                
                 status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, status = RobotState(bots[i].state)))
 
 
