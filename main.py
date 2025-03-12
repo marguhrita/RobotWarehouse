@@ -38,7 +38,6 @@ class RobotManager():
     
 
     def stop_subscriber(self):
-        # Cleanup
         self.sub.destroy_node()
         rclpy.shutdown()
 
@@ -49,23 +48,24 @@ class RobotManager():
         while True:
             for bot in self.sub.bots:
                 if bot.nav_manager == None:
-                    bot.nav_manager = Bot((0.0,0.0,0.0), bot.name)
+                    print(f"botname{bot.name}")
+                    bot.nav_manager = Bot((0.0,0.0,0.0), f"{bot.name}")
                     print(bot)
             time.sleep(1)
 
     def navigate_bot(self, name : str, pos : tuple[float, float, float]):
-        for b in self.sub.bots:
-            if b.name == name:
-                nav_thread = threading.Thread(target=b.navigate_to_position, args = (pos[0],pos[1],pos[2]))
-                nav_thread.start()
-                print(f"Navigating bot {b.name}")
+        b = self.search_bot(name)
+        print(f"Navigating bot {b.name}")
+        nav_thread = threading.Thread(target=b.nav_manager.navigate_to_position, args = (pos[0],pos[1],pos[2]))
+        nav_thread.start()
 
     def search_bot(self, name : str) -> BotEntry:
         bot : BotEntry
         for b in self.sub.bots:
             if b.name == name:
                 return b
-            
+        
+        print(f"Bot {name} not found!")
         return None
         
 
@@ -210,14 +210,16 @@ class Console:
                     self.output_text = "navigate command takes 2 arguments! use the format navigate <bot_name> <(x,y,z)>"
                     return
                 
-                bot_name = bot_manager.search_bot(split[1])
+                bot = bot_manager.search_bot(split[1])
 
-                if not bot_name:
+                if not bot:
                     self.output_text = f"Robot {split[1]} could not be found!"
                     return
 
                 pos : tuple[float, float, float] = split[2]
-                self.bot_manager.navigate_bot(bot_name, pos)
+                pos_tuple = tuple(float(x) for x in pos[1:-1].split(','))
+
+                self.bot_manager.navigate_bot(bot.name, pos_tuple)
                 self.output_text = f"Navigating robot {split[1]} to position {split[2]}"
             except:
                 raise Exception("oops!")
@@ -228,17 +230,7 @@ class Console:
  
 #endregion
 
-
-
 bot_manager = RobotManager()
-
-
-
-def navigate(x,y,z):
-    nav_thread = threading.Thread(target=bot.navigate_to_position, args = (x,y,z))
-    nav_thread.start()
-
-#state_pub = RobotStatePublisher()
 
 # Main loop
 def main():

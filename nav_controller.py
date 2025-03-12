@@ -7,28 +7,30 @@ import time
 from util import RobotStatePublisher, RobotState
 
 
-
 class Bot():
     def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
         #rclpy.init()
         self.navigator = BasicNavigator(namespace)
+        print("hihi")
         self.namespace = namespace
         
         # Set initial pose
         self.initial_pos = initial_position
         initial_pose_stamped = self.get_pose_stamped(initial_position)
         
-        self.navigator.lifecycleStartup()
+        #self.navigator.lifecycleStartup()
 
         #autostart nav2
         #self.nav2_process = self.nav2_autostart("map.yaml")
-        self.navigator.waitUntilNav2Active()
-        self.navigator.setInitialPose(initial_pose_stamped)
+        #self.navigator.waitUntilNav2Active()
+        print("oop")
 
+        self.navigator.setInitialPose(initial_pose_stamped)
+        print("hi?")
         self.pub = RobotStatePublisher()
         
         # Load Map
-        self.navigator.changeMap('map.yaml')
+        #self.navigator.changeMap('map.yaml')
 
     def nav2_autostart(self, map_path : str):
         # Run the ros2 launch command
@@ -70,67 +72,34 @@ class Bot():
 
 
 
-    def navigate_to_position(self, x,y,z, fetching : bool):
+    def navigate_to_position(self, x,y,z, fetching : bool = False):
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'map'
         goal_pose.header.stamp = self.navigator.get_clock().now().to_msg()
-        goal_pose.pose.position.x = x
-        goal_pose.pose.position.y = y
+        goal_pose.pose.position.x = float(x)
+        goal_pose.pose.position.y = float(y)
         goal_pose.pose.orientation.w = 1.0
         goal_pose.pose.orientation.z = 0.0
 
+        print("!")
 
-        # sanity check a valid path exists
-        # path = navigator.getPath(initial_pose, goal_pose)
+        goal_pose = f"pose: {{header: {{frame_id: map}}, pose: {{position: {{x: {x}, y: {y}, z: 0.0}}, orientation:{{x: 0.0, y: 0.0, z: 0, w: 1.0000000}}}}}}"
 
-        self.navigator.goToPose(goal_pose)
+        command = ["ros2", "action", "send_goal",
+                    f"/{self.namespace}/navigate_to_pose",
+                    "nav2_msgs/action/NavigateToPose",
+                    goal_pose]
 
-        i = 0
-        while not self.navigator.isTaskComplete():
-            ################################################
-            #
-            # Implement some code here for your application!
-            #
-            ################################################
-            self.pub.publish(self.namespace, RobotState.NAVIGATING)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-            # Do something with the feedback
-            i = i + 1
-            feedback = self.navigator.getFeedback()
+        print(command)
+        for line in process.stdout:
+            if line.strip().startswith("Goal accepted")
+            # You can parse or print each line of output here
+            print("Output:", line.strip())
 
-            if feedback and i % 5 == 0:
-                print(
-                    'Estimated time of arrival: '
-                    + '{0:.0f}'.format(
-                        Duration.from_msg(feedback.estimated_time_remaining).nanoseconds
-                        / 1e9
-                    )
-                    + ' seconds.'
-                )
-
-                # Some navigation timeout to demo cancellation
-                if Duration.from_msg(feedback.navigation_time) > Duration(seconds=600.0):
-                    self.navigator.cancelTask()
-
-
-        # Do something depending on the return code
-        result = self.navigator.getResult()
-        if result == TaskResult.SUCCEEDED:
-            print('Goal succeeded!')
-            if fetching:
-                x,y,z = self.initial_pos
-                self.navigate_to_position(x,y,z, False)
-        elif result == TaskResult.CANCELED:
-            print('Goal was canceled!')
-        elif result == TaskResult.FAILED:
-            print('Goal failed!')
-        else:
-            print('Goal has an invalid return status!')
-
-        self.pub.publish(RobotState.NAVIGATING_DONE)
-
-        #self.navigator.lifecycleShutdown()
             
         
+            
             

@@ -93,7 +93,7 @@ class RobotState(IntEnum):
 
 class RobotStatePublisher():
     def __init__(self):
-        rclpy.init()
+        #rclpy.init()
 
         self.robot_state_pub = RobotStatePub()
 
