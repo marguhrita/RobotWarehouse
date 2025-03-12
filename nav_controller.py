@@ -4,6 +4,7 @@ import rclpy
 from rclpy.duration import Duration
 import subprocess
 import time
+from util import RobotStatePublisher, RobotState
 
 
 
@@ -11,11 +12,11 @@ class Bot():
     def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
         rclpy.init()
         self.navigator = BasicNavigator(namespace)
+        self.namespace = namespace
         
         # Set initial pose
         self.initial_pos = initial_position
         initial_pose_stamped = self.get_pose_stamped(initial_position)
-        
         
         self.navigator.lifecycleStartup()
 
@@ -24,9 +25,8 @@ class Bot():
         self.navigator.waitUntilNav2Active()
         self.navigator.setInitialPose(initial_pose_stamped)
 
-
+        self.pub = RobotStatePublisher()
         
-
         # Load Map
         self.navigator.changeMap('map.yaml')
 
@@ -93,10 +93,12 @@ class Bot():
             # Implement some code here for your application!
             #
             ################################################
+            self.pub.publish(self.namespace, RobotState.NAVIGATING)
 
             # Do something with the feedback
             i = i + 1
             feedback = self.navigator.getFeedback()
+
             if feedback and i % 5 == 0:
                 print(
                     'Estimated time of arrival: '
@@ -125,6 +127,8 @@ class Bot():
             print('Goal failed!')
         else:
             print('Goal has an invalid return status!')
+
+        self.pub.publish(RobotState.NAVIGATING_DONE)
 
         #self.navigator.lifecycleShutdown()
             

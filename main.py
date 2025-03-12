@@ -2,11 +2,74 @@ import pygame
 import threading
 from nav_controller import Bot
 from PIL import Image
-from util import RobotStatePublisher
-from state_pubsub.state_pub import RobotState
-from state_pubsub.state_sub import RobotStateSub
+from util import RobotStatePublisher, RobotState
+#from state_pubsub.state_pub import RobotState
+from state_pubsub.state_sub import RobotStateSub, BotEntry
 from typing import List, TypedDict
 import rclpy
+from dataclasses import dataclass
+import time
+
+
+class RobotManager():
+    """
+    Stores a list of robots, as well as their current state.\n
+    Updates their current state by observing robot_state topic as well as other topics.
+
+    Class Variables:
+    - `bots` (list[BotEntry]): Tracks available robots and holds relevant information about them (state)
+    """
+    def __init__(self):
+
+        rclpy.init()
+        self.sub = RobotStateSub()
+
+
+        #start subscriber in different thread
+        ros_thread = threading.Thread(target=self.start_subscriber, args=(self.sub,), daemon=True)
+        ros_thread.start()
+
+        #Create nav instances if they do not exist
+        self.timer_thread = threading.Thread(target=self.update_bots, daemon=True)
+        self.timer_thread.start()
+
+    def start_subscriber(self, node):
+        rclpy.spin(node)
+    
+
+    def stop_subscriber(self):
+        # Cleanup
+        self.sub.destroy_node()
+        rclpy.shutdown()
+
+    def print_bots(self):
+        print(self.sub.bots)
+
+    def update_bots(self):
+        while True:
+            for bot in self.sub.bots:
+                if bot.nav_manager == None:
+                    bot.nav_manager = Bot((0,0,0), bot.name)
+                    print(bot)
+            time.sleep(1)
+
+    def navigate_bot(self, name : str, pos : tuple[float, float, float]):
+        for b in self.sub.bots:
+            if b.name == name:
+                nav_thread = threading.Thread(target=b.navigate_to_position, args = (pos[0],pos[1],pos[2]))
+                nav_thread.start()
+                print(f"Navigating bot {b.name}")
+
+    def search_bot(self, name : str) -> BotEntry:
+        bot : BotEntry
+        for b in self.sub.bots:
+            if b.name == name:
+                return b
+            
+        return None
+        
+
+
 
 
 #region pygame init
@@ -16,23 +79,6 @@ pygame.init()
 SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 1000
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Robot Warehouse")
-def pgm():
-    # Load PGM image using Pillow
-    pgm_path = "map.pgm"  # Replace with your PGM file path
-    image = Image.open(pgm_path)
-
-    # Convert grayscale to RGB (Pygame requires RGB format)
-    image = image.convert("RGB")
-
-    # Resize image to 350x350 (using LANCZOS for high-quality scaling)
-    image = image.resize((350, 350), Image.LANCZOS)
-
-    # Convert Pillow image to Pygame surface
-    pgm_surface = pygame.image.fromstring(image.tobytes(), image.size, "RGB")
-    
-    return pgm_surface
-
-pgm_surface = pgm()
 
 # constants
 WHITE = (255, 255, 255)
@@ -79,7 +125,7 @@ class Button():
 
 
 class StatusBar:
-    def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, status="Idle"):
+    def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, status : RobotState = RobotState(1)):
         self.x, self.y = x, y
         self.width, self.height = width, height
         self.name = name
@@ -96,7 +142,7 @@ class StatusBar:
 
 
         # Draw status text
-        status_text = font.render(f"Status: {self.status}", True, BLACK)
+        status_text = font.render(f"Status: {self.status.name}", True, BLACK)
         surface.blit(status_text, (self.x + 10, self.y + 40))
 
         # Draw battery bar outline
@@ -122,38 +168,67 @@ class StatusBar:
     def update_status(self, new_status):
         self.status = new_status
 
+    
+class Console:
+    def __init__(self, x, y, width, height, bot_manager : RobotManager):
+        self.x, self.y, self.width, self.height = x, y, width, height
+        self.text = ""
+        self.output_text = ""
+        self.active = False
+        self.bot_manager = bot_manager
 
+    def draw(self, surface):
+        pygame.draw.rect(surface, BLACK, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(surface, WHITE, (self.x + 2, self.y + 2, self.width - 4, self.height - 4))
+        
+        # Draw text
+        text_surface = font.render(self.text, True, BLACK)
+        error_text_surface = font.render(self.output_text, True, RED)
+        surface.blit(text_surface, (self.x + 5, self.y + 5))
+        surface.blit(error_text_surface, (self.x + 5, self.y + 50))
+
+
+    def handle_event(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                self.process_command(self.text)
+                self.text = "" #clear input
+
+            elif event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+
+            # Add key (which the user pressed)
+            else:
+                self.text += event.unicode
+
+    def process_command(self, command):
+        if command.lower().startswith("navigate"):
+            try:
+                split = command.lower().split(" ")
+                
+                if len(split) < 3:
+                    self.output_text = "navigate command takes 2 arguments! use the format navigate <bot_name> <(x,y,z)>"
+                    return
+                
+                bot_name = bot_manager.search_bot(split[1])
+
+                if not bot_name:
+                    self.output_text = f"Robot {split[1]} could not be found!"
+                    return
+
+                pos : tuple[float, float, float] = split[2]
+                self.bot_manager.navigate_bot(bot_name, pos)
+                self.output_text = f"Navigating robot {split[1]} to position {split[2]}"
+            except:
+                raise Exception("oops!")
+        
+        else:
+            print("unrecognised command")
+
+ 
 #endregion
 
 
-class RobotManager():
-    """
-    Stores a list of robots, as well as their current state.\n
-    Updates their current state by observing robot_state topic as well as other topics.
-
-    Class Variables:
-    - `bots` (list[BotEntry]): Tracks available robots and holds relevant information about them (state)
-    """
-    def __init__(self):
-
-        rclpy.init()
-        self.sub = RobotStateSub()
-
-        #start subscriber in different thread
-        ros_thread = threading.Thread(target=self.start_subscriber, args=(self.sub,), daemon=True)
-        ros_thread.start()
-
-    def start_subscriber(self, node):
-        rclpy.spin(node)
-
-    def stop_subscriber(self):
-        # Cleanup
-        self.sub.destroy_node()
-        rclpy.shutdown()
-
-
-#region commander init
-#bot = Bot((1.7,0.222,0),"tb3_0")
 
 bot_manager = RobotManager()
 
@@ -164,6 +239,7 @@ def navigate(x,y,z):
     nav_thread.start()
 
 #state_pub = RobotStatePublisher()
+fps = 0
 
 # Main loop
 def main():
@@ -184,17 +260,14 @@ def main():
     offset_x = 175
     start_y = 150
     start_x = 25
-    # button_goal_a = Button(start_x, start_y, 150, 80, "Goal A", font, GRAY, DARK_GRAY)
-    # button_goal_b = Button(start_x + offset_x, start_y, 150, 80, "Goal B", font, GRAY, DARK_GRAY)
-    # button_goal_c = Button(start_x, + start_y + offset_y, 150, 80, "Goal C", font, GRAY, DARK_GRAY)
-    # button_goal_d = Button(start_x + offset_x, start_y + offset_y, 150, 80, "Goal D", font, GRAY, DARK_GRAY)
-    button_start = Button(50, start_y + offset_y * 2, 150, 80, "START", font, GREEN, DARK_GRAY)
-    button_stop = Button(50, SCREEN_HEIGHT - 100, 150, 80, "STOP", font, RED, DARK_GRAY)
+
+    button_refresh = Button(200, SCREEN_HEIGHT - 200, 150, 80, "RESET", font, GREEN, DARK_GRAY)
+    button_stop = Button(50, SCREEN_HEIGHT - 200, 150, 80, "STOP", font, RED, DARK_GRAY)
 
 
     # button list
     button_list.append(button_stop)
-    #button_list.append(button_start)
+    button_list.append(button_refresh)
     
     #endregion
 
@@ -227,18 +300,12 @@ def main():
             s_y = 150
             print(not s_x + status_gap + status_width > x_lim)
             
-
-
-    print(status_pos)
-    for i in range(len(status_pos)):
-        print(i)
-
-        status_list.append(StatusBar(status_pos[i][0], status_pos[i][1]))
-
-
+    #console
+    console = Console(0, SCREEN_HEIGHT-100, SCREEN_WIDTH, 100, bot_manager)
+ 
     #endregion
     
- 
+    
     while running:
         screen.fill(ALGAE)
 
@@ -250,8 +317,21 @@ def main():
             #region mainpage
             if button_stop.is_clicked(event):
                 print("STOPPING")
+                bot_manager.print_bots()
+
+            if event.type == pygame.KEYDOWN:
+                console.handle_event(event)
 
             #endregion
+
+        if fps % 30 == 0:
+            fps = 0
+            bots = bot_manager.sub.bots
+            for i in range(len(bots)):
+                print(bot_manager.sub.bots)
+                print(RobotState(bots[i].state))
+                status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, status = RobotState(bots[i].state)))
+
 
         #Nav bar
         pygame.draw.rect(screen, DARK_GREEN, (nav_x, nav_y, nav_width, nav_height))
@@ -268,8 +348,12 @@ def main():
             #pygame.draw.rect(screen, CREAM, (status_x, status_y, status_width, status_height))
             for s in status_list:
                 s.draw(screen)
+
+            #console
+            console.draw(screen)
             
         pygame.display.flip()
+        fps += 1
         clock.tick(60)
 
     #bot.end_nav2_process()
