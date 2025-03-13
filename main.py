@@ -7,6 +7,7 @@ import rclpy
 from dataclasses import dataclass
 import time
 import csv
+import asyncio
 
 
 class RobotManager():
@@ -199,6 +200,7 @@ class Console:
         self.output_text = ""
         self.active = False
         self.bot_manager = bot_manager
+        self.output_text_colour = RED
 
     def draw(self, surface):
         pygame.draw.rect(surface, BLACK, (self.x, self.y, self.width, self.height))
@@ -206,7 +208,7 @@ class Console:
         
         # Draw text
         text_surface = font.render(self.text, True, BLACK)
-        error_text_surface = font.render(self.output_text, True, RED)
+        error_text_surface = font.render(self.output_text, True, self.output_text_colour)
         surface.blit(text_surface, (self.x + 5, self.y + 5))
         surface.blit(error_text_surface, (self.x + 5, self.y + 50))
 
@@ -231,12 +233,14 @@ class Console:
                 
                 if len(split) < 3:
                     self.output_text = "navigate command takes 2 arguments! use the format navigate <bot_name> <(x,y,z)>"
+                    self.output_text_colour = RED
                     return
                 
                 bot = self.bot_manager.search_bot(split[1])
 
                 if not bot:
                     self.output_text = f"Robot {split[1]} could not be found!"
+                    self.output_text_colour = RED
                     return
 
                 pos : tuple[float, float, float] = split[2]
@@ -244,6 +248,8 @@ class Console:
 
                 self.bot_manager.navigate_bot(bot.name, pos_tuple)
                 self.output_text = f"Navigating robot {split[1]} to position {split[2]}"
+                self.output_text_colour = GREEN
+
             except:
                 raise Exception("oops!")
         
