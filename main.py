@@ -1,14 +1,12 @@
 import pygame
 import threading
 from nav_controller import Bot
-from PIL import Image
 from util import RobotStatePublisher, RobotState
-#from state_pubsub.state_pub import RobotState
 from state_pubsub.state_sub import RobotStateSub, BotEntry
-from typing import List, TypedDict
 import rclpy
 from dataclasses import dataclass
 import time
+import csv
 
 
 class RobotManager():
@@ -21,9 +19,8 @@ class RobotManager():
     """
     def __init__(self):
 
-        rclpy.init()
         self.sub = RobotStateSub()
-
+        self.pub = RobotStatePublisher()
 
         #start subscriber in different thread
         ros_thread = threading.Thread(target=self.start_subscriber, args=(self.sub,), daemon=True)
@@ -32,6 +29,32 @@ class RobotManager():
         #Create nav instances if they do not exist
         self.timer_thread = threading.Thread(target=self.update_bots, daemon=True)
         self.timer_thread.start()
+
+        # Load robot information into robot_details dictionary
+        self.robots_config = [dict]
+        self.load_config()
+
+    def load_config(self):
+        with open("warehouse_robots_config.csv", newline="", encoding="utf-8") as csvfile:
+
+            # Add each robot in csv file and add to robot_entry
+            reader = list(csv.reader(csvfile))
+            for row in reader[1:]:
+                self.robots_config.append(
+                    {
+                        "name" : row[0],
+                        "start_pos" : (row[1],row[2],row[3]),
+                        "delivery_pos" : (row[4],row[5],row[6])
+                    }
+                )
+        print(self.robots_config)
+
+    def search_config(self, name : str) -> dict:
+        print(self.robots_config)
+        for c in self.robots_config:
+            if c["name"] == name:
+                return c
+        raise Exception("Robot name must match a robot in warehouse robot config file!")
 
     def start_subscriber(self, node):
         rclpy.spin(node)
@@ -48,16 +71,18 @@ class RobotManager():
         while True:
             for bot in self.sub.bots:
                 if bot.nav_manager == None:
-                    print(f"botname{bot.name}")
-                    bot.nav_manager = Bot((0.0,0.0,0.0), f"{bot.name}")
-                    print(bot)
+                    bot_details = self.search_config(bot.name)
+                    bot.nav_manager = Bot(bot_details["start_pos"], bot_details["delivery_pos"], f"{bot.name}", self.pub)
+                    
             time.sleep(1)
 
     def navigate_bot(self, name : str, pos : tuple[float, float, float]):
         b = self.search_bot(name)
         print(f"Navigating bot {b.name}")
-        nav_thread = threading.Thread(target=b.nav_manager.navigate_to_position, args = (pos[0],pos[1],pos[2]))
+        nav_thread = threading.Thread(target=b.nav_manager.navigate_to_position, args = (pos[0],pos[1],0))
         nav_thread.start()
+
+    
 
     def search_bot(self, name : str) -> BotEntry:
         bot : BotEntry
@@ -125,12 +150,12 @@ class Button():
 
 
 class StatusBar:
-    def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, status : RobotState = RobotState(1)):
+    def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, bot = BotEntry):
         self.x, self.y = x, y
         self.width, self.height = width, height
         self.name = name
         self.battery = battery 
-        self.status = status
+        self.bot = bot
 
     def draw(self, surface):
         # Draw status bar background
@@ -142,7 +167,7 @@ class StatusBar:
 
 
         # Draw status text
-        status_text = font.render(f"Status: {self.status.name}", True, BLACK)
+        status_text = font.render(f"Status: {RobotState(self.bot.state).name}", True, BLACK)
         surface.blit(status_text, (self.x + 10, self.y + 40))
 
         # Draw battery bar outline
@@ -163,10 +188,8 @@ class StatusBar:
 
 
     def update_battery(self, value):
-        self.battery = max(1, min(100, value))  # Clamp battery between 1 and 100
+        self.battery = max(1, min(100, value))
 
-    def update_status(self, new_status):
-        self.status = new_status
 
     
 class Console:
@@ -210,7 +233,7 @@ class Console:
                     self.output_text = "navigate command takes 2 arguments! use the format navigate <bot_name> <(x,y,z)>"
                     return
                 
-                bot = bot_manager.search_bot(split[1])
+                bot = self.bot_manager.search_bot(split[1])
 
                 if not bot:
                     self.output_text = f"Robot {split[1]} could not be found!"
@@ -230,7 +253,6 @@ class Console:
  
 #endregion
 
-bot_manager = RobotManager()
 
 # Main loop
 def main():
@@ -239,7 +261,9 @@ def main():
     mainpage = True
     button_list = []
     fps = 0
+    rclpy.init()
 
+    bot_manager = RobotManager()
 
     #region navbarinit
     nav_pad = 20
@@ -316,12 +340,12 @@ def main():
 
             #endregion
 
-        if fps % 30 == 0:
+        if fps % 10 == 0:
             fps = 0
             bots = bot_manager.sub.bots
             for i in range(len(bots)):
                 
-                status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, status = RobotState(bots[i].state)))
+                status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, bot=bots[i]))
 
 
         #Nav bar

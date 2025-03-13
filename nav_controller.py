@@ -5,50 +5,55 @@ from rclpy.duration import Duration
 import subprocess
 import time
 from util import RobotStatePublisher, RobotState
+import os
 
 
 class Bot():
-    def __init__(self : object, initial_position : tuple[float, float, float], namespace : str):
-        #rclpy.init()
-        self.navigator = BasicNavigator(namespace)
-        print("hihi")
+    def __init__(self : object, initial_position : tuple[float, float, float], delivery_position : tuple[float,float,float], namespace : str, publisher : RobotStatePublisher):
+
         self.namespace = namespace
-        
-        # Set initial pose
+        self.delivery_pose = delivery_position
         self.initial_pos = initial_position
-        initial_pose_stamped = self.get_pose_stamped(initial_position)
+
+        # Start nav
+        self.nav2_start()
+      
+        print(f"namespace:{self.namespace}")
         
-        #self.navigator.lifecycleStartup()
+        self.pub = publisher
 
-        #autostart nav2
-        #self.nav2_process = self.nav2_autostart("map.yaml")
-        #self.navigator.waitUntilNav2Active()
-        print("oop")
 
-        self.navigator.setInitialPose(initial_pose_stamped)
-        print("hi?")
-        self.pub = RobotStatePublisher()
-        
-        # Load Map
-        #self.navigator.changeMap('map.yaml')
+    def set_initial_pose(self, pose : tuple[list,list,list]):
+        goal_pose = f"{{header:{{stamp: {{sec: 0, nanosec: 0}}, frame_id: map}}, pose: {{position: {{x: {pose[0]}, y: {pose[1]}, z: {pose[2]}}}, orientation:{{x: 0.0, y: 0.0, z: 0, w: 1.0000000}}}}}}"
+        command = ["ros2", "topic", "pub", "--once", "--qos-reliability", "reliable", f"/{self.namespace}/initialpose", "geometry_msgs/PoseWithCovarianceStamped", goal_pose]
+        p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        print("Init pose set")
 
-    def nav2_autostart(self, map_path : str):
+    def nav2_start(self):
+        print(f"Launching nav for robot: {self.namespace}")
         # Run the ros2 launch command
+        env = os.environ.copy()  # Copy current environment variables
+        env["QT_QPA_PLATFORM"] = "xcb"  # Force Qt to use X11 instead of Wayland
+
         process = subprocess.Popen(
-            ["gnome-terminal", "--", 'ros2', 'launch', 'turtlebot3_navigation2', 'navigation2.launch.py', f'map:={map_path}'],
+            ['ros2', 'launch', "robot_w", "multi_robot.launch.py", f"namespace:={self.namespace}"],
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
+            env=env
         )
 
-        print("Nav2 starting..")
-        #time.sleep(5)
 
+
+        for line in process.stdout:
+            print("Output:", line.strip())
+
+            if b"active" in line.strip():
+                self.set_initial_pose(self.initial_pos)
+            
 
         return process
     
 
-    def end_nav2_process(self):
-        self.nav2_process.terminate()
 
     def go_to_initial_pose(self):
         self.navigate_to_position(self.initial_pos, False)
@@ -57,15 +62,15 @@ class Bot():
 
         x, y, z = pos
         # Set initial pose!
-        initial_pose = PoseStamped()
-        initial_pose.header.frame_id = 'map'
-        initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
-        initial_pose.pose.position.x = x
-        initial_pose.pose.position.y = y
-        initial_pose.pose.orientation.z = 0.0
-        initial_pose.pose.orientation.w = 1.0
+        # initial_pose = PoseStamped()
+        # initial_pose.header.frame_id = 'map'
+        # initial_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+        # initial_pose.pose.position.x = x
+        # initial_pose.pose.position.y = y
+        # initial_pose.pose.orientation.z = 0.0
+        # initial_pose.pose.orientation.w = 1.0
 
-        return initial_pose
+        #return initial_pose
     
     def fetch_item(self, goal_pose : tuple[float, float, float]):
         self.navigate_to_position(goal_pose, True)
@@ -73,16 +78,16 @@ class Bot():
 
 
     def navigate_to_position(self, x,y,z, fetching : bool = False):
+        print(f"namespace:{self.namespace}")
 
-        goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'map'
-        goal_pose.header.stamp = self.navigator.get_clock().now().to_msg()
-        goal_pose.pose.position.x = float(x)
-        goal_pose.pose.position.y = float(y)
-        goal_pose.pose.orientation.w = 1.0
-        goal_pose.pose.orientation.z = 0.0
 
-        print("!")
+        # goal_pose = PoseStamped()
+        # goal_pose.header.frame_id = 'map'
+        # goal_pose.header.stamp = self.navigator.get_clock().now().to_msg()
+        # goal_pose.pose.position.x = float(x)
+        # goal_pose.pose.position.y = float(y)
+        # goal_pose.pose.orientation.w = 1.0
+        # goal_pose.pose.orientation.z = 0.0
 
         goal_pose = f"pose: {{header: {{frame_id: map}}, pose: {{position: {{x: {x}, y: {y}, z: 0.0}}, orientation:{{x: 0.0, y: 0.0, z: 0, w: 1.0000000}}}}}}"
 
@@ -95,8 +100,11 @@ class Bot():
 
         print(command)
         for line in process.stdout:
-            if line.strip().startswith("Goal accepted")
-            # You can parse or print each line of output here
+            if line.strip().startswith("Goal accepted"):
+                self.pub.publish(self.namespace, 2)
+            elif line.strip().startswith("Goal finished"):
+                self.pub.publish(self.namespace, 3)
+
             print("Output:", line.strip())
 
             

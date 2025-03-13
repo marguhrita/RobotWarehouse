@@ -93,14 +93,13 @@ class RobotState(IntEnum):
 
 class RobotStatePublisher():
     def __init__(self):
-        #rclpy.init()
 
         self.robot_state_pub = RobotStatePub()
 
     def publish(self, name : str, state : RobotState):
-        rclpy.spin(self.robot_state_pub)
-        self.robot_state_pub.publish(state)
-        rclpy.shutdown()
+        #rclpy.spin(self.robot_state_pub)
+        self.robot_state_pub.publish(f"/{name}", state = state)
+        #rclpy.shutdown()
 
     def shutdown(self):
         self.robot_state_pub.destroy_node()
