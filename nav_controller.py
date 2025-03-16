@@ -19,7 +19,7 @@ class Bot():
 
         self.namespace = namespace
         self.delivery_pose = delivery_position
-        self.initial_pos = initial_position
+        self.initial_pose = initial_position
 
         # Start nav
         self.nav2_start()
@@ -34,8 +34,6 @@ class Bot():
         goal_pose = f"{{header: {{stamp: {{sec: 0, nanosec: 0}}, frame_id: map}}, pose: {{pose: {{position: {{x: {pose[0]}, y: {pose[1]}, z: 0.0}}, orientation: {{x: 0.0, y: 0.0, z: -0.005862246656604559, w: 0.9999828168844388}}}}}}}}"
         command = ["ros2", "topic", "pub", "--once", "--qos-reliability", "reliable", f"/{self.namespace}/initialpose", "geometry_msgs/PoseWithCovarianceStamped", goal_pose]
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        print("Init pose set")
         #debug
         # for line in p.stdout:
         #     print(line)
@@ -44,27 +42,32 @@ class Bot():
         #     print(line)
 
 
+    def nav2_exit(self):
+        self.process.kill()
 
     def nav2_start(self):
         print(f"Launching nav for robot: {self.namespace}")
-        process = subprocess.Popen(
+        self.process = subprocess.Popen(
             ['ros2', 'launch', "robot_w", "multi_robot.launch.py", f"namespace:={self.namespace}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
 
-        self.set_initial_pose(self.initial_pos)
+        self.set_initial_pose(self.initial_pose)
 
     def navigate_to_start_pose(self):
+        self.navigate_to_position(self.initial_pose[0], self.initial_pose[1], self.initial_pose[2])
+
+    def navigate_to_delivery_pose(self):
         self.navigate_to_position(self.delivery_pose[0], self.delivery_pose[1], self.delivery_pose[2])
 
 
-    def go_to_initial_pose(self):
-        self.navigate_to_position(self.initial_pos, False)
-    
-    def fetch_item(self, goal_pose : tuple[float, float, float]):
-        self.navigate_to_position(goal_pose, True)
-
+    def fetch_item(self, x : float, y : float, z : float, wait_time : float = 4):
+        self.navigate_to_position(x, y, z)
+        time.sleep(wait_time)
+        self.navigate_to_delivery_pose()
+        time.sleep(wait_time)
+        self.navigate_to_start_pose()
 
 
     def navigate_to_position(self, x,y,z):

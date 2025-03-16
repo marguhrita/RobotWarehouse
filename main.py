@@ -39,6 +39,12 @@ class RobotManager():
         self.robots_config = [dict]
         self.load_config()
 
+        # Load product information
+        self.products = [dict]
+        self.load_products()
+
+        
+
     def set_robots_pinging(self):
         for b in self.sub.bots:
             if b.state == RobotState.ONLINE:
@@ -59,14 +65,39 @@ class RobotManager():
                         "delivery_pos" : (row[4],row[5],row[6])
                     }
                 )
-        print(self.robots_config)
 
-    def search_config(self, name : str) -> dict:
-        print(self.robots_config)
+    def load_products(self):
+        with open("warehouse_products.csv", newline="", encoding="utf-8") as csvfile:
+
+            # Add each robot in csv file and add to robot_entry
+            reader = list(csv.reader(csvfile))
+            for row in reader[1:]:
+                self.products.append(
+                    {
+                        "product_id" : row[0],
+                        "pos" : (row[1],row[2],row[3])
+                    }
+                )
+
+
+    def search_config(self, search_name : str) -> dict:
+
         for c in self.robots_config:
-            if c["name"] == name:
+            if c["name"] == search_name:
                 return c
-        raise Exception("Robot name must match a robot in warehouse robot config file!")
+            
+        print("Search term not found!")
+        return {}
+            
+    
+    def search_products(self, name : str) -> dict:
+
+        for c in self.products:
+            if c["product_id"] == name:
+                return c
+            
+        print("Search term not found!")
+        return {}
 
     def start_subscriber(self, node):
         rclpy.spin(node)
@@ -84,17 +115,25 @@ class RobotManager():
             for bot in self.sub.bots:
                 if bot.nav_manager == None:
                     bot_details = self.search_config(bot.name)
+
+                    if not bot_details:
+                        print(self.robots_config)
+                        raise Exception(f"Bot {bot.name} not found in config file!")
+                    
                     bot.nav_manager = Bot(bot_details["start_pos"], bot_details["delivery_pos"], f"{bot.name}", self.pub)
                     
-            time.sleep(1)
+            time.sleep(5)
 
-    def navigate_bot(self, name : str, pos : tuple[float, float, float]):
-        b = self.search_bot(name)
-        print(f"Navigating bot {b.name}")
-        nav_thread = threading.Thread(target=b.nav_manager.navigate_to_position, args = (pos[0],pos[1],0))
+    def navigate_bot(self, bot : BotEntry, pos : tuple[float, float, float]):
+        print(f"Navigating bot {bot.name}")
+        nav_thread = threading.Thread(target=bot.nav_manager.navigate_to_position, args = (pos[0],pos[1],0))
+        nav_thread.daemon = True
         nav_thread.start()
 
-    
+    def fetch_product(self, bot : BotEntry, pos : tuple[float, float, float]):
+        nav_thread = threading.Thread(target=bot.nav_manager.fetch_item, args = (pos[0],pos[1],0))
+        nav_thread.daemon = True
+        nav_thread.start()
 
     def search_bot(self, name : str) -> BotEntry:
         bot : BotEntry
@@ -255,12 +294,12 @@ class Console:
                 self.text += event.unicode
 
     def process_command(self, command):
-        if command.lower().startswith("navigate"):
+        if command.lower().startswith("navigate") or command.lower().startswith("fetch"):
             try:
                 split = command.lower().split(" ")
                 
                 if len(split) < 3:
-                    self.output_text = "navigate command takes 2 arguments! use the format navigate <bot_name> <(x,y,z)>"
+                    self.output_text = f"{split[0]} command takes 2 arguments! use the format {split[0]} <bot_name> <(x,y,z)>"
                     self.output_text_colour = RED
                     return
                 
@@ -271,18 +310,35 @@ class Console:
                     self.output_text_colour = RED
                     return
 
-                pos : tuple[float, float, float] = split[2]
-                pos_tuple = tuple(float(x) for x in pos[1:-1].split(','))
+                
+                if split[0].lower() == "navigate":
 
-                self.bot_manager.navigate_bot(bot.name, pos_tuple)
-                self.output_text = f"Navigating robot {split[1]} to position {split[2]}"
-                self.output_text_colour = GREEN
+                    pos : tuple[float, float, float] = split[2]
+                    pos_tuple = tuple(float(x) for x in pos[1:-1].split(','))
+
+                    self.bot_manager.navigate_bot(bot, pos_tuple)
+                    self.output_text = f"Navigating robot {split[1]} to position {split[2]}"
+                    self.output_text_colour = GREEN
+
+                elif split[0].lower() == "fetch":
+                    product_id = split[2]
+                    product = self.bot_manager.search_products(product_id)
+                    if not product:
+                        self.output_text = f"Product {split[2]} not found in products file!"
+                        self.output_text_colour = RED
+
+                    
+                    self.bot_manager.fetch_product(bot, product["pos"])
+                    self.output_text = f"Fetching item {product_id}!"
+                    self.output_text_colour = GREEN
 
             except:
-                raise Exception("oops!")
-        
+                raise Exception("navigate command has encountered an error")
+            
         else:
-            print("unrecognised command")
+            self.output_text = f"Unrecognized command..."
+            self.output_text_colour = RED
+
 
  
 #endregion
@@ -313,13 +369,13 @@ def main():
     start_y = 150
     start_x = 25
 
-    button_refresh = Button(200, SCREEN_HEIGHT - 200, 150, 80, "RESET", font, GREEN, DARK_GRAY)
+    #button_refresh = Button(200, SCREEN_HEIGHT - 200, 150, 80, "RESET", font, GREEN, DARK_GRAY)
     button_stop = Button(50, SCREEN_HEIGHT - 200, 150, 80, "STOP", font, RED, DARK_GRAY)
 
 
     # button list
     button_list.append(button_stop)
-    button_list.append(button_refresh)
+    #button_list.append(button_refresh)
     
     #endregion
 
@@ -368,7 +424,9 @@ def main():
             #region mainpage
             if button_stop.is_clicked(event):
                 print("STOPPING")
-                bot_manager.print_bots()
+                pygame.quit()
+
+                
 
             if event.type == pygame.KEYDOWN:
                 console.handle_event(event)
@@ -423,8 +481,6 @@ def main():
         fps_timeout_timer += 1
         clock.tick(60)
 
-    #bot.end_nav2_process()
-    #print("Shutting down nav2")
     pygame.quit()
 
 if __name__ == "__main__":
