@@ -1,13 +1,13 @@
 import pygame
 import threading
 from nav_controller import Bot
-from util import RobotStatePublisher, RobotState
-from state_pubsub.state_sub import RobotStateSub, BotEntry
+from util import RobotStatePublisher
+from state_pubsub.state_sub import RobotStateSub, BotEntry, RobotState
 import rclpy
 from dataclasses import dataclass
 import time
 import csv
-import asyncio
+import copy
 
 
 class RobotManager():
@@ -19,9 +19,13 @@ class RobotManager():
     - `bots` (list[BotEntry]): Tracks available robots and holds relevant information about them (state)
     """
     def __init__(self):
+        
 
         self.sub = RobotStateSub()
         self.pub = RobotStatePublisher()
+
+        # Robot ping timeout - this is seconds/60, assuming a pygame framerate of 60
+        self.ping_timeout = 10 * 60 # check every 5 seconds - online status should be published every second for each robot, so ~4 chances to not be set to offline
 
         #start subscriber in different thread
         ros_thread = threading.Thread(target=self.start_subscriber, args=(self.sub,), daemon=True)
@@ -34,6 +38,13 @@ class RobotManager():
         # Load robot information into robot_details dictionary
         self.robots_config = [dict]
         self.load_config()
+
+    def set_robots_pinging(self):
+        for b in self.sub.bots:
+            if b.state == RobotState.ONLINE:
+                print(f"Set {b.name} to pinging")
+                b.state = RobotState.PINGING
+
 
     def load_config(self):
         with open("warehouse_robots_config.csv", newline="", encoding="utf-8") as csvfile:
@@ -157,7 +168,11 @@ class StatusBar:
         self.name = name
         self.battery = battery 
         self.bot = bot
+        self.nav_states = [RobotState.NAVIGATING, RobotState.NAV_DONE, RobotState.NAV_ERROR]
+        self.last_state = ""
+        self.last_nav_state = ""
 
+      
     def draw(self, surface):
         # Draw status bar background
         pygame.draw.rect(surface, CREAM, (self.x, self.y, self.width, self.height), border_radius=10)
@@ -168,8 +183,21 @@ class StatusBar:
 
 
         # Draw status text
-        status_text = font.render(f"Status: {RobotState(self.bot.state).name}", True, BLACK)
+        if self.bot.state not in self.nav_states:
+            self.last_state = RobotState(self.bot.state).name
+
+        status_text = font.render(f"Status: {self.last_state}", True, BLACK)
+
+
+        # Draw nav_status text
+        if self.bot.state in self.nav_states:
+            self.last_nav_state = RobotState(self.bot.state).name
+
+        nav_status_text = font.render(f"Nav: {self.last_nav_state}", True, BLACK)
+
+        #print(f"last_state: {self.last_state}, last_nav_state: {self.last_nav_state}")  
         surface.blit(status_text, (self.x + 10, self.y + 40))
+        surface.blit(nav_status_text, (self.x + 250, self.y + 40))
 
         # Draw battery bar outline
         battery_x = self.x + 10
@@ -267,6 +295,7 @@ def main():
     mainpage = True
     button_list = []
     fps = 0
+    fps_timeout_timer = 0
     rclpy.init()
 
     bot_manager = RobotManager()
@@ -346,12 +375,26 @@ def main():
 
             #endregion
 
+
+        # Check for new robots, and add a status tab for it
         if fps % 10 == 0:
             fps = 0
             bots = bot_manager.sub.bots
-            for i in range(len(bots)):
+            status_bot_names = [s.name for s in status_list]
+            for i, b in enumerate(bots):
+                if not b.name in status_bot_names:
+                    status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, bot=bots[i]))
+
+        # Set robots to pinging, and check for existing pinging robots
+        if fps_timeout_timer % bot_manager.ping_timeout == 0:
+            fps_timeout_timer = 0
+            for b in bot_manager.sub.bots:
+                if b.state == RobotState.PINGING:
+                    print(f"Bot {b.name} set to offline!")
+                    b.state = RobotState.OFFLINE
                 
-                status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, bot=bots[i]))
+
+            bot_manager.set_robots_pinging()
 
 
         #Nav bar
@@ -374,7 +417,10 @@ def main():
             console.draw(screen)
             
         pygame.display.flip()
+
+        # Increment timers
         fps += 1
+        fps_timeout_timer += 1
         clock.tick(60)
 
     #bot.end_nav2_process()

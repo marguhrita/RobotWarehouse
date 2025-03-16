@@ -85,11 +85,14 @@ def getHeading(q):
                      q.w * q.w + q.x * q.x - q.y * q.y - q.z * q.z)
     return yaw
 
+
 class RobotState(IntEnum):
     ONLINE = 0
     OFFLINE = 1
     NAVIGATING = 2
     NAVIGATING_DONE = 3
+    NAVIGATING_ERROR = 4
+    PINGING = 5
 
 class RobotStatePublisher():
     def __init__(self):
