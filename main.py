@@ -7,7 +7,6 @@ import rclpy
 from dataclasses import dataclass
 import time
 import csv
-import copy
 
 
 class RobotManager():
@@ -29,15 +28,15 @@ class RobotManager():
         self.pub = RobotStatePublisher()
 
         # Robot ping timeout - this is seconds/60, assuming a pygame framerate of 60
-        self.ping_timeout = 10 * 60 # check every 5 seconds - online status should be published every second for each robot, so ~4 chances to not be set to offline
+        self.ping_timeout = 15 * 60 # check every 15 seconds - online status should be published every 5 seconds for each robot, so ~3 chances to not be set to offline
 
         #start subscriber in different thread
         ros_thread = threading.Thread(target=self.start_subscriber, args=(self.sub,), daemon=True)
         ros_thread.start()
 
-        #Create nav instances if they do not exist
-        self.timer_thread = threading.Thread(target=self.update_bots, daemon=True)
-        self.timer_thread.start()
+        #Create nav instances if they do not exist (Now implemented with PyGame timer)
+        # self.timer_thread = threading.Thread(target=self.update_bots, daemon=True)
+        # self.timer_thread.start()
 
         # Load robot information into robot_details dictionary
         self.robots_config = [dict]
@@ -115,18 +114,18 @@ class RobotManager():
         print(self.sub.bots)
 
     def update_bots(self):
-        while True:
-            for bot in self.sub.bots:
-                if bot.nav_manager == None:
-                    bot_details = self.search_config(bot.name)
+    
+        for bot in self.sub.bots:
+            if bot.nav_manager == None:
+                bot_details = self.search_config(bot.name)
 
-                    if not bot_details:
-                        print(self.robots_config)
-                        raise Exception(f"Bot {bot.name} not found in config file!")
-                    
-                    bot.nav_manager = NavManager(bot_details["start_pos"], bot_details["delivery_pos"], f"{bot.name}", self.pub)
-                    
-            time.sleep(5)
+                if not bot_details:
+                    print(self.robots_config)
+                    raise Exception(f"Bot {bot.name} not found in config file!")
+                
+                bot.nav_manager = NavManager(bot_details["start_pos"], bot_details["delivery_pos"], f"{bot.name}", self.pub)
+                
+            
 
     def navigate_bot(self, bot : BotEntry, pos : tuple[float, float, float]):
         print(f"Navigating bot {bot.name}")
@@ -354,7 +353,6 @@ def main():
     running = True
     mainpage = True
     button_list = []
-    fps = 0
     fps_timeout_timer = 0
     rclpy.init()
 
@@ -367,11 +365,6 @@ def main():
 
     button_list.append(button_nav_main)
 
-    #region mainpageinit
-    offset_y = 100
-    offset_x = 175
-    start_y = 150
-    start_x = 25
 
     #button_refresh = Button(200, SCREEN_HEIGHT - 200, 150, 80, "RESET", font, GREEN, DARK_GRAY)
     button_stop = Button(50, SCREEN_HEIGHT - 200, 150, 80, "STOP", font, RED, DARK_GRAY)
@@ -430,33 +423,35 @@ def main():
                 print("STOPPING")
                 pygame.quit()
 
-                
-
             if event.type == pygame.KEYDOWN:
                 console.handle_event(event)
 
             #endregion
 
+        
+        if fps_timeout_timer % bot_manager.ping_timeout == 0:
+            fps_timeout_timer = 0
+            # Add navigation manager to bots if it does not already exist
+            bot_manager.update_bots()
 
-        # Check for new robots, and add a status tab for it
-        if fps % 10 == 0:
-            fps = 0
+            # Set robots to pinging, and check for existing pinging robots
+            for b in bot_manager.sub.bots:
+                if b.state == RobotState.PINGING:
+                    print(f"Bot {b.name} set to offline!")
+                    b.state = RobotState.OFFLINE
+            bot_manager.set_robots_pinging()
+
+            # Check for new robots, and add a status tab if found
             bots = bot_manager.sub.bots
             status_bot_names = [s.name for s in status_list]
             for i, b in enumerate(bots):
                 if not b.name in status_bot_names:
                     status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, bot=bots[i]))
 
-        # Set robots to pinging, and check for existing pinging robots
-        if fps_timeout_timer % bot_manager.ping_timeout == 0:
-            fps_timeout_timer = 0
-            for b in bot_manager.sub.bots:
-                if b.state == RobotState.PINGING:
-                    print(f"Bot {b.name} set to offline!")
-                    b.state = RobotState.OFFLINE
-                
 
-            bot_manager.set_robots_pinging()
+            
+
+
 
 
         #Nav bar
@@ -480,8 +475,7 @@ def main():
             
         pygame.display.flip()
 
-        # Increment timers
-        fps += 1
+        # Increment timer
         fps_timeout_timer += 1
         clock.tick(60)
 
