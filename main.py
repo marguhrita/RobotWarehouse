@@ -1,6 +1,6 @@
 import pygame
 import threading
-from nav_controller import Bot
+from nav_controller import NavManager
 from util import RobotStatePublisher
 from state_pubsub.state_sub import RobotStateSub, BotEntry, RobotState
 import rclpy
@@ -12,8 +12,12 @@ import copy
 
 class RobotManager():
     """
+    Starts robot_state subscriber
     Stores a list of robots, as well as their current state.\n
-    Updates their current state by observing robot_state topic as well as other topics.
+    Checks bots for nav instances, and creates them in separate thread if they do not exist
+    Loads robot details and product details from config
+    Navigate and Search functions which run on a nav manager in a new thread
+
 
     Class Variables:
     - `bots` (list[BotEntry]): Tracks available robots and holds relevant information about them (state)
@@ -120,7 +124,7 @@ class RobotManager():
                         print(self.robots_config)
                         raise Exception(f"Bot {bot.name} not found in config file!")
                     
-                    bot.nav_manager = Bot(bot_details["start_pos"], bot_details["delivery_pos"], f"{bot.name}", self.pub)
+                    bot.nav_manager = NavManager(bot_details["start_pos"], bot_details["delivery_pos"], f"{bot.name}", self.pub)
                     
             time.sleep(5)
 

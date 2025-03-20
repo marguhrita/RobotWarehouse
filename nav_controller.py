@@ -14,7 +14,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 
 
-class Bot():
+class NavManager():
     def __init__(self : object, initial_position : tuple[float, float, float], delivery_position : tuple[float,float,float], namespace : str, publisher : RobotStatePublisher):
 
         self.namespace = namespace
