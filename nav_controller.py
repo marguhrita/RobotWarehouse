@@ -47,8 +47,11 @@ class Bot():
 
     def nav2_start(self):
         print(f"Launching nav for robot: {self.namespace}")
+
+        map_dir = os.path.abspath("map.yaml")
+
         self.process = subprocess.Popen(
-            ['ros2', 'launch', "robot_w", "multi_robot.launch.py", f"namespace:={self.namespace}"],
+            ['ros2', 'launch', "robot_w", "multi_robot.launch.py", f"namespace:={self.namespace}", f"map:={map_dir}"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
