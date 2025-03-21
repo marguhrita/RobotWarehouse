@@ -54,6 +54,13 @@ class RobotManager():
                 print(f"Set {b.name} to pinging")
                 b.state = RobotState.PINGING
 
+    
+    def check_bots_offline(self):
+        for b in self.sub.bots:
+            if b.state == RobotState.PINGING:
+                print(f"Bot {b.name} set to offline!")
+                b.state = RobotState.OFFLINE
+
 
     def load_config(self):
         with open("warehouse_robots_config.csv", newline="", encoding="utf-8") as csvfile:
@@ -104,7 +111,6 @@ class RobotManager():
 
     def start_subscriber(self, node):
         rclpy.spin(node)
-    
 
     def stop_subscriber(self):
         self.sub.destroy_node()
@@ -435,10 +441,7 @@ def main():
             bot_manager.update_bots()
 
             # Set robots to pinging, and check for existing pinging robots
-            for b in bot_manager.sub.bots:
-                if b.state == RobotState.PINGING:
-                    print(f"Bot {b.name} set to offline!")
-                    b.state = RobotState.OFFLINE
+            bot_manager.check_bots_offline()
             bot_manager.set_robots_pinging()
 
             # Check for new robots, and add a status tab if found
@@ -447,12 +450,6 @@ def main():
             for i, b in enumerate(bots):
                 if not b.name in status_bot_names:
                     status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, bot=bots[i]))
-
-
-            
-
-
-
 
         #Nav bar
         pygame.draw.rect(screen, DARK_GREEN, (nav_x, nav_y, nav_width, nav_height))
