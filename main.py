@@ -153,17 +153,8 @@ class RobotManager():
         print(f"Bot {name} not found!")
         return None
         
+#region pygame elements
 
-
-
-
-#region pygame init
-pygame.init()
-
-# Screen dimensions
-SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 1000
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Robot Warehouse")
 
 # constants
 WHITE = (255, 255, 255)
@@ -174,7 +165,7 @@ RED = (255,0,0)
 GREEN = (0,255,0)
 ALGAE = (96, 108, 56)
 DARK_GREEN = (40, 54, 24)
-CREAM = (254, 250, 224)
+CREAM = (254, 250, 224) 
 font = pygame.font.Font(None, 40)
 
 
@@ -229,17 +220,14 @@ class StatusBar:
         name_text = font.render(f"Name: {self.name}", True, BLACK)
         surface.blit(name_text, (self.x + 10, self.y + 10))
 
-
-        # Draw status text
-        if self.bot.state not in self.nav_states:
-            self.last_state = RobotState(self.bot.state).name
-
-        status_text = font.render(f"Status: {self.last_state}", True, BLACK)
-
-
-        # Draw nav_status text
+          # Draw nav_status text
         if self.bot.state in self.nav_states:
             self.last_nav_state = RobotState(self.bot.state).name
+        else:
+            self.last_state = RobotState(self.bot.state).name
+
+       
+        status_text = font.render(f"Status: {self.last_state}", True, BLACK)
 
         nav_status_text = font.render(f"Nav: {self.last_nav_state}", True, BLACK)
 
@@ -322,7 +310,7 @@ class Console:
                 
                 if split[0].lower() == "navigate":
 
-                    pos : tuple[float, float, float] = split[2]
+                    pos = split[2]
                     pos_tuple = tuple(float(x) for x in pos[1:-1].split(','))
 
                     self.bot_manager.navigate_bot(bot, pos_tuple)
@@ -342,7 +330,7 @@ class Console:
                     self.output_text_colour = GREEN
 
             except:
-                raise Exception("navigate command has encountered an error")
+                raise Exception("command has encountered an error")
             
         else:
             self.output_text = f"Unrecognized command..."
@@ -355,6 +343,15 @@ class Console:
 
 # Main loop
 def main():
+
+    pygame.init()
+
+    # Screen dimensions
+    SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 1000
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+    pygame.display.set_caption("Robot Warehouse")
+
+
     clock = pygame.time.Clock()
     running = True
     mainpage = True
@@ -378,7 +375,6 @@ def main():
 
     # button list
     button_list.append(button_stop)
-    #button_list.append(button_refresh)
     
     #endregion
 
@@ -409,7 +405,8 @@ def main():
         if s_y + status_gap + status_height > y_lim:
             s_x += x_app
             s_y = 150
-            print(not s_x + status_gap + status_width > x_lim)
+
+    
             
     #console
     console = Console(0, SCREEN_HEIGHT-100, SCREEN_WIDTH, 100, bot_manager)
@@ -448,8 +445,11 @@ def main():
             bots = bot_manager.sub.bots
             status_bot_names = [s.name for s in status_list]
             for i, b in enumerate(bots):
-                if not b.name in status_bot_names:
-                    status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = bots[i].name, bot=bots[i]))
+                if len(status_list) >= len(status_pos):
+                    print("Not enough positions available!")
+                else:
+                    if not b.name in status_bot_names:
+                        status_list.append(StatusBar(status_pos[i][0], status_pos[i][1], name = b.name, bot=b))
 
         #Nav bar
         pygame.draw.rect(screen, DARK_GREEN, (nav_x, nav_y, nav_width, nav_height))
