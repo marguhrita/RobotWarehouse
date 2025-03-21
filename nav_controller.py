@@ -5,14 +5,6 @@ from rclpy.duration import Duration
 import subprocess
 import time
 from util import RobotStatePublisher, RobotState
-import os
-import launch
-import launch_ros
-from launch import LaunchService
-from ament_index_python.packages import get_package_share_directory
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-
-
 
 class NavManager():
     def __init__(self : object, initial_position : tuple[float, float, float], delivery_position : tuple[float,float,float], namespace : str, publisher : RobotStatePublisher):
@@ -28,19 +20,11 @@ class NavManager():
         
         self.pub = publisher
 
-
-    def set_initial_pose(self, pose : tuple[list,list,list]):
+    def set_initial_pose(self, pose : tuple[float,float,float]):
 
         goal_pose = f"{{header: {{stamp: {{sec: 0, nanosec: 0}}, frame_id: map}}, pose: {{pose: {{position: {{x: {pose[0]}, y: {pose[1]}, z: 0.0}}, orientation: {{x: 0.0, y: 0.0, z: -0.005862246656604559, w: 0.9999828168844388}}}}}}}}"
         command = ["ros2", "topic", "pub", "--once", "--qos-reliability", "reliable", f"/{self.namespace}/initialpose", "geometry_msgs/PoseWithCovarianceStamped", goal_pose]
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        #debug
-        # for line in p.stdout:
-        #     print(line)
-        
-        # for line in p.stderr:
-        #     print(line)
-
 
     def nav2_exit(self):
         self.process.kill()
@@ -64,14 +48,12 @@ class NavManager():
     def navigate_to_delivery_pose(self):
         self.navigate_to_position(self.delivery_pose[0], self.delivery_pose[1], self.delivery_pose[2])
 
-
     def fetch_item(self, x : float, y : float, z : float, wait_time : float = 4):
         self.navigate_to_position(x, y, z)
         time.sleep(wait_time)
         self.navigate_to_delivery_pose()
         time.sleep(wait_time)
         self.navigate_to_start_pose()
-
 
     def navigate_to_position(self, x,y,z):
         print(f"namespace:{self.namespace}")
