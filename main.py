@@ -134,7 +134,6 @@ class RobotManager():
             
 
     def navigate_bot(self, bot : BotEntry, pos : tuple[float, float, float]):
-        print(f"Navigating bot {bot.name}")
         nav_thread = threading.Thread(target=bot.nav_manager.navigate_to_position, args = (pos[0],pos[1],0))
         nav_thread.daemon = True
         nav_thread.start()
@@ -202,8 +201,7 @@ class Button():
 
 class StatusBar:
     def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, bot = BotEntry):
-        self.x, self.y = x, y
-        self.width, self.height = width, height
+        self.rect = (x, y, width, height)
         self.name = name
         self.battery = battery 
         self.bot = bot
@@ -214,7 +212,7 @@ class StatusBar:
       
     def draw(self, surface):
         # Draw status bar background
-        pygame.draw.rect(surface, CREAM, (self.x, self.y, self.width, self.height), border_radius=10)
+        pygame.draw.rect(surface, CREAM, self.rect, border_radius=10)
 
         # Draw name
         name_text = font.render(f"Name: {self.name}", True, BLACK)
@@ -252,7 +250,7 @@ class StatusBar:
         surface.blit(battery_text, (battery_x + battery_width + 10, battery_y))
 
 
-    def update_battery(self, value):
+    def update_battery(self, value : int):
         self.battery = max(1, min(100, value))
 
 
