@@ -3,8 +3,9 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 import rclpy
 from rclpy.duration import Duration
 import subprocess
-import time
+import time, os
 from util import RobotStatePublisher, RobotState
+
 
 class NavManager():
     def __init__(self : object, initial_position : tuple[float, float, float], delivery_position : tuple[float,float,float], namespace : str, publisher : RobotStatePublisher):
@@ -74,6 +75,7 @@ class NavManager():
                 self.pub.publish(self.namespace, 3)
             elif line.strip().startswith("Goal Aborted"):
                 self.pub.publish(self.namespace, 4)
+                self.navigate_to_start_pose()
 
             print("Output:", line.strip())
 

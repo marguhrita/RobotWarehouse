@@ -54,12 +54,21 @@ class RobotManager():
                 print(f"Set {b.name} to pinging")
                 b.state = RobotState.PINGING
 
+
     
     def check_bots_offline(self):
         for b in self.sub.bots:
             if b.state == RobotState.PINGING:
                 print(f"Bot {b.name} set to offline!")
                 b.state = RobotState.OFFLINE
+
+
+    def reset_battery_state_timer(self):
+        self.sub.battery_state_set.update({key : False for key in self.sub.battery_state_set})
+
+        print(f"Current battery states: {dict}")
+        print("Reset battery state timers!")
+
 
 
     def load_config(self):
@@ -165,15 +174,15 @@ GREEN = (0,255,0)
 ALGAE = (96, 108, 56)
 DARK_GREEN = (40, 54, 24)
 CREAM = (254, 250, 224) 
-font = pygame.font.Font(None, 40)
+#font = pygame.font.Font(None, 40)
 
 
 class Button():
-    def __init__(self, x, y, width, height, text, font, base_color, hover_color):
+    def __init__(self, x, y, width, height, text, base_color, hover_color):
         
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
-        self.font = font
+        self.font = font = pygame.font.Font(None, 40)
         self.base_color = base_color
         self.hover_color = hover_color
 
@@ -201,8 +210,10 @@ class Button():
 
 class StatusBar:
     def __init__(self, x, y, width = 500, height = 100, name="Robot", battery=0, bot = BotEntry):
+        self.x, self.y = x,y
         self.rect = (x, y, width, height)
         self.name = name
+        self.font = pygame.font.Font(None, 40)
         self.battery = battery 
         self.bot = bot
         self.nav_states = [RobotState.NAVIGATING, RobotState.NAV_DONE, RobotState.NAV_ERROR]
@@ -215,7 +226,7 @@ class StatusBar:
         pygame.draw.rect(surface, CREAM, self.rect, border_radius=10)
 
         # Draw name
-        name_text = font.render(f"Name: {self.name}", True, BLACK)
+        name_text = self.font.render(f"Name: {self.name}", True, BLACK)
         surface.blit(name_text, (self.x + 10, self.y + 10))
 
           # Draw nav_status text
@@ -225,11 +236,10 @@ class StatusBar:
             self.last_state = RobotState(self.bot.state).name
 
        
-        status_text = font.render(f"Status: {self.last_state}", True, BLACK)
+        status_text = self.font.render(f"Status: {self.last_state}", True, BLACK)
 
-        nav_status_text = font.render(f"Nav: {self.last_nav_state}", True, BLACK)
+        nav_status_text = self.font.render(f"Nav: {self.last_nav_state}", True, BLACK)
 
-        #print(f"last_state: {self.last_state}, last_nav_state: {self.last_nav_state}")  
         surface.blit(status_text, (self.x + 10, self.y + 40))
         surface.blit(nav_status_text, (self.x + 250, self.y + 40))
 
@@ -246,18 +256,20 @@ class StatusBar:
         pygame.draw.rect(surface, battery_fill_color, (battery_x + 2, battery_y + 2, battery_fill_width, battery_height - 4))
 
         # Display battery percentage
-        battery_text = font.render(f"Battery: {self.battery}%", True, BLACK)
+        self.update_battery(self.bot.battery_state)
+        battery_text = self.font.render(f"Battery: {self.battery}%", True, BLACK)
         surface.blit(battery_text, (battery_x + battery_width + 10, battery_y))
 
 
-    def update_battery(self, value : int):
-        self.battery = max(1, min(100, value))
+    def update_battery(self, value : float):
+        self.battery = max(1, min(100, int(value)))
 
 
     
 class Console:
     def __init__(self, x, y, width, height, bot_manager : RobotManager):
         self.x, self.y, self.width, self.height = x, y, width, height
+        self.font = pygame.font.Font(None, 40)
         self.text = ""
         self.output_text = ""
         self.active = False
@@ -269,8 +281,8 @@ class Console:
         pygame.draw.rect(surface, WHITE, (self.x + 2, self.y + 2, self.width - 4, self.height - 4))
         
         # Draw text
-        text_surface = font.render(self.text, True, BLACK)
-        error_text_surface = font.render(self.output_text, True, self.output_text_colour)
+        text_surface = self.font.render(self.text, True, BLACK)
+        error_text_surface = self.font.render(self.output_text, True, self.output_text_colour)
         surface.blit(text_surface, (self.x + 5, self.y + 5))
         surface.blit(error_text_surface, (self.x + 5, self.y + 50))
 
@@ -324,7 +336,7 @@ class Console:
 
                     
                     self.bot_manager.fetch_product(bot, product["pos"])
-                    self.output_text = f"Fetching item {product_id}!"
+                    self.output_text = f"Robot {split[1]} fetching item {product_id}!"
                     self.output_text_colour = GREEN
 
             except:
@@ -344,6 +356,7 @@ def main():
 
     pygame.init()
 
+
     # Screen dimensions
     SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 1000
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -362,13 +375,13 @@ def main():
     #region navbarinit
     nav_pad = 20
     nav_x, nav_y, nav_width, nav_height = 0, 0, SCREEN_WIDTH, 120
-    button_nav_main = Button(nav_pad, nav_pad, 150, 80, "Home", font, CREAM, DARK_GRAY)
+    button_nav_main = Button(nav_pad, nav_pad, 150, 80, "Home", CREAM, DARK_GRAY)
 
     button_list.append(button_nav_main)
 
 
     #button_refresh = Button(200, SCREEN_HEIGHT - 200, 150, 80, "RESET", font, GREEN, DARK_GRAY)
-    button_stop = Button(50, SCREEN_HEIGHT - 200, 150, 80, "STOP", font, RED, DARK_GRAY)
+    button_stop = Button(50, SCREEN_HEIGHT - 200, 150, 80, "STOP", RED, DARK_GRAY)
 
 
     # button list
@@ -438,6 +451,9 @@ def main():
             # Set robots to pinging, and check for existing pinging robots
             bot_manager.check_bots_offline()
             bot_manager.set_robots_pinging()
+
+            # Reset battery state sent timer, allowing new battery states to be sent
+            bot_manager.reset_battery_state_timer()
 
             # Check for new robots, and add a status tab if found
             bots = bot_manager.sub.bots
